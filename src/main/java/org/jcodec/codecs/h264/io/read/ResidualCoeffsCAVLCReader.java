@@ -4,14 +4,12 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readZeroBitCount;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.ResidualBlock.BlockType;
 import org.jcodec.codecs.h264.io.model.RunBeforeToken;
 import org.jcodec.codecs.h264.io.model.TotalZerosToken;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -28,7 +26,7 @@ public class ResidualCoeffsCAVLCReader {
         this.chromaFormat = chromaFormat;
     }
 
-    public int[] readCoeffs(InBits in, BlockType blockType, CoeffToken coeffToken) throws IOException {
+    public int[] readCoeffs(BitReader in, BlockType blockType, CoeffToken coeffToken)  {
 
         int maxCoeff = blockType.getMaxCoeffs();
         if (blockType == blockType.BLOCK_CHROMA_DC)

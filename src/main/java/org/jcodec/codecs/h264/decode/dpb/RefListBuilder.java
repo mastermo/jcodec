@@ -112,17 +112,12 @@ public class RefListBuilder {
     }
 
     private Picture[] buildRefList(DecodedPicture[] buf, int curFrameNo) {
-        DecodedPicture[] copy = new DecodedPicture[buf.length];
-        System.arraycopy(buf, 0, copy, 0, buf.length);
-
-        int len = orderRefList(copy, curFrameNo);
-
-        Picture[] list = new Picture[buf.length];
-        for (int i = 0; i < len; i++) {
-            list[i] = copy[i].getPicture();
+        Picture[] result = new Picture[buf.length];
+        for (int i = 0; i < buf.length; i++) {
+            result[i] = buf[i].getPicture();
         }
 
-        return list;
+        return result;
     }
 
     private int orderRefList(DecodedPicture[] buf, int curFrameNo) {

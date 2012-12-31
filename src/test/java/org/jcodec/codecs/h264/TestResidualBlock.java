@@ -1,16 +1,14 @@
 package org.jcodec.codecs.h264;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.ResidualBlock.BlockType;
-import org.jcodec.codecs.h264.io.read.CAVLCReader;
 import org.jcodec.codecs.h264.io.read.ResidualCoeffsCAVLCReader;
 import org.jcodec.codecs.util.BinUtil;
-import org.jcodec.common.io.BitstreamReader;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 import org.junit.Test;
 
 public class TestResidualBlock extends JAVCTestCase {
@@ -59,7 +57,7 @@ public class TestResidualBlock extends JAVCTestCase {
 
 	private void testResidual(String code, int[] expected, CoeffToken token,
 			BlockType blockType) throws IOException {
-		InBits reader = new BitstreamReader(new ByteArrayInputStream(BinUtil
+	    BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil
 				.binaryStringToBytes(code)));
 
 		ResidualCoeffsCAVLCReader residualReader = new ResidualCoeffsCAVLCReader(

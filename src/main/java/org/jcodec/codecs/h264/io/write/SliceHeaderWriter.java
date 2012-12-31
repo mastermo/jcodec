@@ -5,8 +5,6 @@ import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeSE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeU;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeUE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.RefPicMarking;
@@ -17,7 +15,7 @@ import org.jcodec.codecs.h264.io.model.RefPicReordering.ReorderOp;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.io.model.SliceType;
-import org.jcodec.common.io.OutBits;
+import org.jcodec.common.io.BitWriter;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -37,7 +35,7 @@ public class SliceHeaderWriter {
         this.pps = pps;
     }
 
-    public void write(SliceHeader sliceHeader, boolean idrSlice, int nalRefIdc, OutBits writer) throws IOException {
+    public void write(SliceHeader sliceHeader, boolean idrSlice, int nalRefIdc, BitWriter writer) {
         writeUE(writer, sliceHeader.first_mb_in_slice, "SH: first_mb_in_slice");
         writeUE(writer, sliceHeader.slice_type.ordinal() + (sliceHeader.slice_type_restr ? 5 : 0), "SH: slice_type");
         writeUE(writer, sliceHeader.pic_parameter_set_id, "SH: pic_parameter_set_id");
@@ -125,7 +123,7 @@ public class SliceHeaderWriter {
         return uiRet;
     }
 
-    private void writeDecRefPicMarking(SliceHeader sliceHeader, boolean idrSlice, OutBits writer) throws IOException {
+    private void writeDecRefPicMarking(SliceHeader sliceHeader, boolean idrSlice, BitWriter writer) {
         if (idrSlice) {
             RefPicMarkingIDR drpmidr = sliceHeader.refPicMarkingIDR;
             writeBool(writer, drpmidr.isDiscardDecodedPics(), "SH: no_output_of_prior_pics_flag");
@@ -167,7 +165,7 @@ public class SliceHeaderWriter {
         }
     }
 
-    private void writePredWeightTable(SliceHeader sliceHeader, OutBits writer) throws IOException {
+    private void writePredWeightTable(SliceHeader sliceHeader, BitWriter writer) {
         writeUE(writer, sliceHeader.pred_weight_table.luma_log2_weight_denom, "SH: luma_log2_weight_denom");
         if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
             writeUE(writer, sliceHeader.pred_weight_table.chroma_log2_weight_denom, "SH: chroma_log2_weight_denom");
@@ -210,7 +208,7 @@ public class SliceHeaderWriter {
         }
     }
 
-    private void writeRefPicListReordering(SliceHeader sliceHeader, OutBits writer) throws IOException {
+    private void writeRefPicListReordering(SliceHeader sliceHeader, BitWriter writer) {
         if (sliceHeader.slice_type.isInter()) {
             writeBool(writer, sliceHeader.refPicReorderingL0 != null, "SH: ref_pic_list_reordering_flag_l0");
             writeReorderingList(sliceHeader.refPicReorderingL0, writer);
@@ -221,7 +219,7 @@ public class SliceHeaderWriter {
         }
     }
 
-    private void writeReorderingList(RefPicReordering reordering, OutBits writer) throws IOException {
+    private void writeReorderingList(RefPicReordering reordering, BitWriter writer) {
         if (reordering == null)
             return;
 

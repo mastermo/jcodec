@@ -3,13 +3,11 @@ package org.jcodec.samples.prores;
 import static org.jcodec.common.JCodecUtil.bufin;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.prores.ProresToProxy;
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.io.Buffer;
-import org.jcodec.common.io.FileRAInputStream;
-import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.io.FileRAOutputStream;
+import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.io.RAOutputStream;
 import org.jcodec.containers.mp4.Brand;
 import org.jcodec.containers.mp4.MP4Demuxer;
@@ -56,9 +54,10 @@ public class ToProxy {
         long last = from;
         MP4Packet pkt = null;
         while ((pkt = inVideo.getFrames(1)) != null) {
-            Buffer out = new Buffer(pkt.getData().remaining());
+            ByteBuffer out = ByteBuffer.allocate(pkt.getData().remaining());
             toProxy.transcode(pkt.getData(), out);
-            outVideo.addFrame(new MP4Packet(pkt, out.flip()));
+            out.flip();
+            outVideo.addFrame(new MP4Packet(pkt, out));
             frame++;
             long cur = System.currentTimeMillis();
             if (cur - last > 5000) {

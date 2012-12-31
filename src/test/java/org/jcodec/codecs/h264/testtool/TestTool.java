@@ -1,18 +1,19 @@
 package org.jcodec.codecs.h264.testtool;
 
+import static org.jcodec.common.ByteBufferUtil.map;
+
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import org.apache.commons.io.IOUtils;
 import org.jcodec.codecs.h264.H264Decoder;
-import org.jcodec.codecs.h264.annexb.AnnexBDemuxer;
+import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.codecs.util.PGMIO;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 
@@ -27,156 +28,129 @@ import org.jcodec.common.model.Picture;
  */
 public class TestTool {
 
-	static class Args {
-		File refFolder;
-		String h264Name;
-		File framesFolder;
-	}
+    static class Args {
+        File refFolder;
+        String h264Name;
+        File framesFolder;
+    }
 
-	public static void main(String[] args) {
+    public static void main(String[] args) {
 
-		Args a = checkArgs(args);
-		if (args == null)
-			return;
+        Args a = checkArgs(args);
+        if (args == null)
+            return;
 
-		H264Decoder decoder;
-		PocketInputStream is = null;
-		try {
-			is = new PocketInputStream(new BufferedInputStream(
-					new FileInputStream(a.h264Name)));
-			decoder = new H264Decoder(new AnnexBDemuxer(is));
+        H264Decoder decoder;
+        MappedH264ES es;
+        try {
+            es = new MappedH264ES(map(a.h264Name));
+            decoder = new H264Decoder();
+        } catch (IOException e) {
+            System.err.println("Could not read h264 source file");
+            System.exit(-1);
+            return;
+        }
+        
+        Picture buf = Picture.create(1920, 1088, ColorSpace.YUV420);
 
-		} catch (IOException e) {
-			IOUtils.closeQuietly(is);
-			System.err.println("Could not read h264 source file");
-			System.exit(-1);
-			return;
-		}
+        for (int i = 0;; i++) {
 
-		byte[] spspps = is.getPocket();
-		is.reset();
+            String baseName = "ref_d";
+            String nameForY = baseName + i + "y.pgm";
+            String nameForCb = baseName + i + "cb.pgm";
+            String nameForCr = baseName + i + "cr.pgm";
 
-		for (int i = 0;; i++) {
+            try {
+                Picture ref = readFrame(new File(a.refFolder, nameForY), new File(a.refFolder, nameForCb), new File(
+                        a.refFolder, nameForCr));
 
-			String baseName = "ref_d";
-			String nameForY = baseName + i + "y.pgm";
-			String nameForCb = baseName + i + "cb.pgm";
-			String nameForCr = baseName + i + "cr.pgm";
+                System.out.print("\nFrame " + i + " -- ");
+                ByteBuffer nextFrame = es.nextFrame();
+                Picture frame = decoder.decodeFrame(nextFrame.duplicate(), buf.getData());
+                if (frame == null)
+                    break;
 
-			try {
-				Picture ref = readFrame(new File(a.refFolder, nameForY),
-						new File(a.refFolder, nameForCb), new File(a.refFolder,
-								nameForCr));
+                if (a.framesFolder != null) {
+                    File frameFile = new File(a.framesFolder, "frame" + i + ".264");
+                    ByteBufferUtil.writeTo(nextFrame, frameFile);
+                }
 
-				System.out.print("\nFrame " + i + " -- ");
-				Picture frame = decoder.nextPicture();
-				if (frame == null)
-					break;
+                if (!compareFrames(ref, frame)) {
+                    System.out.print("DIFFERS");
+                } else {
+                    System.out.print("EQUALS");
+                }
 
-				byte[] frameBytes = is.getPocket();
-				is.reset();
+            } catch (IOException e) {
+                System.out.println("\nFinished reading frames");
+                break;
+            }
+        }
+    }
 
-				if (a.framesFolder != null) {
-					File frameFile = new File(a.framesFolder, "frame" + i
-							+ ".264");
-					saveFrame(spspps, frameBytes, frameFile);
-				}
+    private static Args checkArgs(String[] args) {
+        if (args.length < 2) {
+            System.err.println("\nSyntax: <folder with ref imgs> <.264 file> [folder to store frames]");
+            System.exit(-1);
+            return null;
+        }
 
-				if (!compareFrames(ref, frame)) {
-					System.out.print("DIFFERS");
-				} else {
-					System.out.print("EQUALS");
-				}
+        Args result = new Args();
+        String folderName = args[0];
+        result.refFolder = new File(folderName);
 
-			} catch (IOException e) {
-				System.out.println("\nFinished reading frames");
-				break;
-			}
-		}
-	}
+        result.h264Name = args[1];
 
-	private static Args checkArgs(String[] args) {
-		if (args.length < 2) {
-			System.err
-					.println("\nSyntax: <folder with ref imgs> <.264 file> [folder to store frames]");
-			System.exit(-1);
-			return null;
-		}
+        if (args.length > 2) {
+            String framesFolderName = args[2];
+            if (framesFolderName != null) {
+                result.framesFolder = new File(framesFolderName);
+            }
+        }
 
-		Args result = new Args();
-		String folderName = args[0];
-		result.refFolder = new File(folderName);
+        return result;
+    }
 
-		result.h264Name = args[1];
+    private static Picture readFrame(File yFile, File cbFile, File crFile) throws IOException {
+        Picture luma = readComponent(yFile);
+        Picture cb = readComponent(cbFile);
+        Picture cr = readComponent(crFile);
 
-		if (args.length > 2) {
-			String framesFolderName = args[2];
-			if (framesFolderName != null) {
-				result.framesFolder = new File(framesFolderName);
-			}
-		}
+        return new Picture(luma.getWidth(), luma.getHeight(), new int[][] { luma.getPlaneData(0), cb.getPlaneData(0),
+                cr.getPlaneData(0) }, ColorSpace.YUV420);
 
-		return result;
-	}
+    }
 
-	private static void saveFrame(byte[] spspps, byte[] frameBytes,
-			File frameFile) throws IOException {
+    private static Picture readComponent(File f) throws IOException {
+        InputStream is = null;
+        try {
+            is = new BufferedInputStream(new FileInputStream(f));
+            return PGMIO.readPGM(is);
+        } finally {
+            IOUtils.closeQuietly(is);
+        }
+    }
 
-		OutputStream out = null;
-		try {
-			out = new BufferedOutputStream(new FileOutputStream(frameFile));
+    private static boolean compareFrames(Picture ref, Picture frame) {
+        if (!compareArray(ref.getPlaneData(0), frame.getPlaneData(0)))
+            return false;
+        if (!compareArray(ref.getPlaneData(1), frame.getPlaneData(1)))
+            return false;
+        if (!compareArray(ref.getPlaneData(2), frame.getPlaneData(2)))
+            return false;
 
-			out.write(spspps);
-			out.write(frameBytes, 0, frameBytes.length - 4);
+        return true;
+    }
 
-			out.flush();
+    private static boolean compareArray(int[] a, int[] b) {
+        if (a.length != b.length)
+            return false;
 
-		} finally {
-			IOUtils.closeQuietly(out);
-		}
-	}
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] != b[i])
+                return false;
+        }
 
-	private static Picture readFrame(File yFile, File cbFile, File crFile)
-			throws IOException {
-		Picture luma = readComponent(yFile);
-		Picture cb = readComponent(cbFile);
-		Picture cr = readComponent(crFile);
-
-		return new Picture(luma.getWidth(), luma.getHeight(), new int[][] {luma.getPlaneData(0), cb
-				.getPlaneData(0), cr.getPlaneData(0)}, ColorSpace.YUV420);
-
-	}
-
-	private static Picture readComponent(File f) throws IOException {
-		InputStream is = null;
-		try {
-			is = new BufferedInputStream(new FileInputStream(f));
-			return PGMIO.readPGM(is);
-		} finally {
-			IOUtils.closeQuietly(is);
-		}
-	}
-
-	private static boolean compareFrames(Picture ref, Picture frame) {
-		if (!compareArray(ref.getPlaneData(0), frame.getPlaneData(0)))
-			return false;
-		if (!compareArray(ref.getPlaneData(1), frame.getPlaneData(1)))
-			return false;
-		if (!compareArray(ref.getPlaneData(2), frame.getPlaneData(2)))
-			return false;
-
-		return true;
-	}
-
-	private static boolean compareArray(int[] a, int[] b) {
-		if (a.length != b.length)
-			return false;
-
-		for (int i = 0; i < a.length; i++) {
-			if (a[i] != b[i])
-				return false;
-		}
-
-		return true;
-	}
+        return true;
+    }
 }

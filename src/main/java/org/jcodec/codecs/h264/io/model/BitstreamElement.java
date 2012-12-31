@@ -1,7 +1,6 @@
 package org.jcodec.codecs.h264.io.model;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 /**
  * This class is part of JCodec ( www.jcodec.org )
@@ -12,5 +11,5 @@ import java.io.OutputStream;
  */
 public abstract class BitstreamElement {
 
-    public abstract void write(OutputStream out) throws IOException;
+    public abstract void write(ByteBuffer out);
 }

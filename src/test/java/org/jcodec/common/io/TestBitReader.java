@@ -1,79 +1,84 @@
 package org.jcodec.common.io;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-
-import junit.framework.Assert;
+import java.nio.ByteBuffer;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
-import org.jcodec.codecs.h264.JAVCTestCase;
 import org.junit.Test;
 
-public class TestBitstreamReader extends JAVCTestCase {
+public class TestBitReader {
 
     @Test
     public void testReader1() throws IOException {
-        BitstreamReader in = reader(new byte[] { b("10011000"), b("00011100"), b("11001101"), b("01010101"),
-                b("11101001"), b("00101110"), b("00000111"), b("00011101"), b("10100100"), b("01101110"),
-                b("10000101"), b("00001100"), b("01010111"), b("01000000") });
+        BitReader in = reader(new byte[] { b("10011000"), b("00011100"), b("11001101"), b("01010101"), b("11101001"),
+                b("00101110"), b("00000111"), b("00011101"), b("10100100"), b("01101110"), b("10000101"),
+                b("00001100"), b("01010111"), b("01000000") });
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("1"), in.read1Bit());
+        assertEquals(i("1"), in.read1Bit());
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("001"), in.readNBit(3));
+        assertEquals(i("00110000001110011001101"), in.checkNBit(23));
+        assertEquals(i("001"), in.readNBit(3));
         assertTrue(in.moreData());
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("1000"), in.readNBit(4));
+        assertEquals(i("1000"), in.readNBit(4));
         assertTrue(in.isByteAligned());
         assertEquals(0, in.curBit());
         assertEquals(7, in.skip(7));
         assertEquals(7, in.curBit());
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("011"), in.readNBit(3));
-        Assert.assertEquals(i("0011"), in.readNBit(4));
-        Assert.assertEquals(35, in.skip(35));
+        assertEquals(i("011"), in.readNBit(3));
+        assertEquals(i("0011010101010"), in.checkNBit(13));
+        assertEquals(i("0011"), in.readNBit(4));
+        assertEquals(35, in.skip(35));
         assertTrue(in.moreData());
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("0011"), in.checkNBit(4));
-        Assert.assertEquals(i("001110110"), in.readNBit(9));
+        assertEquals(i("0011"), in.checkNBit(4));
+        assertEquals(i("001110110"), in.readNBit(9));
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("1"), in.readNBit(1));
+        assertEquals(i("1"), in.readNBit(1));
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("00100"), in.readNBit(5));
+        assertEquals(i("00100"), in.readNBit(5));
         assertTrue(in.moreData());
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("011"), in.readNBit(3));
+        assertEquals(i("011"), in.readNBit(3));
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("01110"), in.checkNBit(5));
-        Assert.assertEquals(i("01110100"), in.readNBit(8));
+        assertEquals(i("01110"), in.checkNBit(5));
+        assertEquals(i("01110100"), in.readNBit(8));
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("001010000110001"), in.readNBit(15));
+        assertEquals(i("001010000110001"), in.readNBit(15));
         assertTrue(in.moreData());
         assertFalse(in.lastByte());
-        Assert.assertEquals(i("010111010"), in.readNBit(9));
+        assertEquals(i("010111010"), in.readNBit(9));
         assertTrue(in.lastByte());
         assertFalse(in.moreData());
-        Assert.assertEquals(i("0"), in.read1Bit());
-        Assert.assertEquals(i("0"), in.read1Bit());
-        Assert.assertEquals(i("0"), in.readNBit(1));
-        Assert.assertEquals(i("00"), in.readNBit(2));
+        assertEquals(i("0"), in.read1Bit());
+        assertEquals(i("0"), in.read1Bit());
+        assertEquals(i("0"), in.readNBit(1));
+        assertEquals(i("00"), in.readNBit(2));
     }
 
-    private BitstreamReader reader(byte[] src) throws IOException {
-        return new BitstreamReader(new BufferedInputStream(new ByteArrayInputStream(src)));
+    private BitReader reader(byte[] src) throws IOException {
+        return new BitReader(ByteBuffer.wrap(src));
     }
 
     @Test
     public void testReader2() throws IOException {
 
-        BitstreamReader in = reader(new byte[] { b("10100111"), b("10101110"), b("10010111"), b("01000010"),
-                b("10100101"), b("11000001"), b("11100001"), b("01010101"), b("00111100"), b("10100011"),
-                b("01010000"), b("01010100"), b("00101010"), b("01010100"), b("10101001"), b("00001010"),
-                b("10000011"), b("11000000"), b("00010101"), b("11010100"), b("10111110"), b("10100100"),
-                b("10001010"), b("01010001"), b("00100000"), b("00111110"), b("00000101"), b("00100100") });
+        BitReader in = reader(new byte[] { b("10100111"), b("10101110"), b("10010111"), b("01000010"), b("10100101"),
+                b("11000001"), b("11100001"), b("01010101"), b("00111100"), b("10100011"), b("01010000"),
+                b("01010100"), b("00101010"), b("01010100"), b("10101001"), b("00001010"), b("10000011"),
+                b("11000000"), b("00010101"), b("11010100"), b("10111110"), b("10100100"), b("10001010"),
+                b("01010001"), b("00100000"), b("00111110"), b("00000101"), b("00100100") });
         assertTrue(in.moreData());
         assertFalse(in.lastByte());
         assertEquals(i("101001111010"), in.readNBit(12));
@@ -109,8 +114,8 @@ public class TestBitstreamReader extends JAVCTestCase {
 
     @Test
     public void testReader3() throws IOException {
-        BitstreamReader in = reader(new byte[] { b("10100111"), b("10101110"), b("10010111"), b("01000010"),
-                b("10100101"), b("11000001"), b("11100001"), b("01010101"), b("00111100"), b("10100011"), b("01010000") });
+        BitReader in = reader(new byte[] { b("10100111"), b("10101110"), b("10010111"), b("01000010"), b("10100101"),
+                b("11000001"), b("11100001"), b("01010101"), b("00111100"), b("10100011"), b("01010000") });
 
         assertEquals(i("1"), in.read1Bit());
         assertEquals(i("0"), in.read1Bit());
@@ -180,9 +185,9 @@ public class TestBitstreamReader extends JAVCTestCase {
     }
 
     public void testReader4() throws Exception {
-        BitstreamReader in = reader(new byte[] { b("00000000"), b("00000000"), b("00000000"), b("00000000"),
-                b("00000000"), b("00000000"), b("00000000"), b("00000000"), b("10001100"), b("00011100"),
-                b("00110100"), b("00010000"), b("11111111") });
+        BitReader in = reader(new byte[] { b("00000000"), b("00000000"), b("00000000"), b("00000000"), b("00000000"),
+                b("00000000"), b("00000000"), b("00000000"), b("10001100"), b("00011100"), b("00110100"),
+                b("00010000"), b("11111111") });
         in.skip(63);
         assertEquals(i("010"), in.readNBit(3));
         assertEquals(i("001"), in.readNBit(3));
@@ -199,12 +204,11 @@ public class TestBitstreamReader extends JAVCTestCase {
     }
 
     public void testReader5() throws Exception {
-        InBits in = new BitstreamReader(new BufferedInputStream(
-                new FileInputStream("src/test/resources/h264/bitstream/data.dat")));
-        InBits in1 = new DummyBitstreamReader(new BufferedInputStream(
-                new FileInputStream("src/test/resources/h264/bitstream/data.dat")));
-        String readFileToString = IOUtils.toString(
-                new FileInputStream("src/test/resources/h264/bitstream/reads.csv"));
+        BitReader in = new BitReader(ByteBuffer.wrap(FileUtils.readFileToByteArray(new File(
+                "src/test/resources/h264/bitstream/data.dat"))));
+        InBits in1 = new DummyBitstreamReader(new BufferedInputStream(new FileInputStream(
+                "src/test/resources/h264/bitstream/data.dat")));
+        String readFileToString = IOUtils.toString(new FileInputStream("src/test/resources/h264/bitstream/reads.csv"));
 
         String[] split = StringUtils.split(readFileToString, ",");
         for (String string : split) {
@@ -237,8 +241,8 @@ public class TestBitstreamReader extends JAVCTestCase {
 
     public void testReader6() throws IOException {
 
-        BitstreamReader in = reader(new byte[] { b("01010100"), b("00011001"), b("10000100"), b("10001111"),
-                b("11101011"), b("10010100"), b("01101010"), b("01011111"), b("01110101") });
+        BitReader in = reader(new byte[] { b("01010100"), b("00011001"), b("10000100"), b("10001111"), b("11101011"),
+                b("10010100"), b("01101010"), b("01011111"), b("01110101") });
 
         assertEquals(0, in.read1Bit());
         assertEquals(1, in.read1Bit());
@@ -312,7 +316,7 @@ public class TestBitstreamReader extends JAVCTestCase {
 
         byte[] data = randomData(10000);
 
-        BitstreamReader in1 = reader(data);
+        BitReader in1 = reader(data);
         DummyBitstreamReader in2 = new DummyBitstreamReader(new ByteArrayInputStream(data));
 
         for (int i = 0; i < 80000; i++) {
@@ -326,7 +330,7 @@ public class TestBitstreamReader extends JAVCTestCase {
         for (int bits = 1; bits <= 32; bits++) {
             byte[] data = randomData(bits * 10000);
 
-            BitstreamReader in1 = reader(data);
+            BitReader in1 = reader(data);
             DummyBitstreamReader in2 = new DummyBitstreamReader(new ByteArrayInputStream(data));
 
             for (int i = 0; i < 80000; i++) {
@@ -340,7 +344,7 @@ public class TestBitstreamReader extends JAVCTestCase {
     @Test
     public void testCheckSkip() throws IOException {
         byte[] data = randomData(2048);
-        BitstreamReader reader = reader(data);
+        BitReader reader = reader(data);
         reader.skip(1000 << 3);
         reader.skip(31);
         for (int i = 0; i < 40; i++) {

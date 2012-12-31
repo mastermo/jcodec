@@ -10,9 +10,11 @@ import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.io.Buffer;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.TapeTimecode;
@@ -112,10 +114,14 @@ public class FrameCache {
         }
     }
 
-    public Packet getFrame(int frameNo, byte[] buffer) throws IOException {
+    public Packet getFrame(int frameNo, ByteBuffer buffer) throws IOException {
+
         IndexRecord record = index.get(frameNo);
         if (record == null)
             return null;
+
+        ByteBuffer out = buffer.duplicate();
+        out.limit(out.position() + record.dataLen);
 
         if (fd == null)
             return null;
@@ -125,20 +131,19 @@ public class FrameCache {
 
             fd.seek(record.pos);
 
-            int remaining = record.dataLen;
             int dsOff = (int) (record.pos - getDataSegmentOff(record));
-            while (remaining > 0) {
-                int toRead = Math.min(remaining, DATASEG_SIZE - dsOff);
-                fd.readFully(buffer, record.dataLen - remaining, toRead);
-                remaining -= toRead;
-                if (remaining > 0) {
+            while (out.remaining() > 0) {
+                int toRead = Math.min(out.remaining(), DATASEG_SIZE - dsOff);
+                ByteBufferUtil.read(fd.getChannel(), out, toRead);
+                if (out.remaining() > 0) {
                     skipToDataseg();
                     dsOff = 0;
                 }
             }
 
-            return new Packet(new Buffer(buffer, 0, record.dataLen), record.pts, 0, record.duration, frameNo,
-                    record.key, record.tapeTimecode);
+            out.flip();
+
+            return new Packet(out, record.pts, 0, record.duration, frameNo, record.key, record.tapeTimecode);
         }
     }
 
@@ -192,15 +197,15 @@ public class FrameCache {
                 return;
             fd.seek(dataSegments.get(dataSegments.size() - 1) + dsFill);
             long pos = fd.getFilePointer();
-            Buffer data = packet.getData().fork();
+            ByteBuffer data = packet.getData().duplicate();
 
             IndexRecord record = new IndexRecord((int) packet.getFrameNo(), pos, packet.getData().remaining(),
                     packet.getPts(), (int) packet.getDuration(), packet.isKeyFrame(), packet.getTapeTimecode());
             index.put((int) packet.getFrameNo(), record);
 
             while (data.remaining() > 0) {
-                Buffer piece = data.read(Math.min(data.remaining(), DATASEG_SIZE - dsFill));
-                piece.writeTo(fd);
+                ByteBuffer piece = ByteBufferUtil.sub(data, Math.min(data.remaining(), DATASEG_SIZE - dsFill));
+                fd.getChannel().write(piece);
                 dsFill += piece.remaining();
 
                 if (dsFill == DATASEG_SIZE) {

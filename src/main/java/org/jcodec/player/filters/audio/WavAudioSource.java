@@ -4,13 +4,14 @@ import static org.jcodec.common.JCodecUtil.bufin;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 
 import javax.sound.sampled.AudioFormat;
 
-import org.jcodec.codecs.wav.StringReader;
 import org.jcodec.codecs.wav.WavHeader;
-import org.jcodec.common.io.Buffer;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.model.AudioFrame;
 import org.jcodec.common.model.RationalLarge;
@@ -47,17 +48,20 @@ public class WavAudioSource implements AudioSource {
                 / frameSize, "", null, format, FRAMES_PER_PACKET, header.getChannelLabels());
     }
 
-    public AudioFrame getFrame(byte[] data) throws IOException {
+    public AudioFrame getFrame(ByteBuffer data) throws IOException {
         int toRead = frameSize * FRAMES_PER_PACKET;
-        if (data.length < toRead)
+        if (data.remaining() < toRead)
             throw new IllegalArgumentException("Data won't fit");
+        ByteBuffer dd = data.duplicate();
+        ReadableByteChannel ch = Channels.newChannel(src);
         int read;
-        if ((read = StringReader.sureRead(src, data, toRead)) != toRead) {
-            Arrays.fill(data, read, toRead, (byte) 0);
+        if ((read = ByteBufferUtil.read(ch, dd, toRead)) != toRead) {
+            ByteBufferUtil.fill(dd, (byte) 0);
         }
         long pts = (src.getPos() - headerSize) / header.fmt.blockAlign;
-        return new AudioFrame(new Buffer(data, 0, toRead), format, FRAMES_PER_PACKET, pts, FRAMES_PER_PACKET,
-                header.fmt.sampleRate, (int) (pts / FRAMES_PER_PACKET));
+        dd.flip();
+        return new AudioFrame(dd, format, FRAMES_PER_PACKET, pts, FRAMES_PER_PACKET, header.fmt.sampleRate,
+                (int) (pts / FRAMES_PER_PACKET));
     }
 
     public boolean drySeek(RationalLarge second) throws IOException {

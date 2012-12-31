@@ -34,10 +34,14 @@ public class Picture {
     }
 
     public Picture(Picture other) {
-        this(other.width, other.height, other.data, other.color);
+        this(other.width, other.height, other.data, other.color, other.crop);
     }
 
     public static Picture create(int width, int height, ColorSpace colorSpace) {
+        return create(width, height, colorSpace, null);
+    }
+
+    public static Picture create(int width, int height, ColorSpace colorSpace, Rect crop) {
         int[] planeSizes = new int[MAX_PLANES];
         for (int i = 0; i < colorSpace.nComp; i++) {
             planeSizes[colorSpace.compPlane[i]] += (width >> colorSpace.compWidth[i])
@@ -54,7 +58,7 @@ public class Picture {
             }
         }
 
-        return new Picture(width, height, data, colorSpace);
+        return new Picture(width, height, data, colorSpace, crop);
     }
 
     public int getWidth() {

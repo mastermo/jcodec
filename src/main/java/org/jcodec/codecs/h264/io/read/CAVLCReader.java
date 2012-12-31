@@ -2,10 +2,8 @@ package org.jcodec.codecs.h264.io.read;
 
 import static org.jcodec.common.tools.Debug.trace;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.BTree;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -20,7 +18,7 @@ public class CAVLCReader {
 
     }
 
-    public static int readNBit(InBits bits, int n, String message) throws IOException {
+    public static int readNBit(BitReader bits, int n, String message)  {
         int val = bits.readNBit(n);
 
         trace(message, String.valueOf(val));
@@ -28,7 +26,7 @@ public class CAVLCReader {
         return val;
     }
 
-    private static int readUE(InBits bits) throws IOException {
+    private static int readUE(BitReader bits)  {
         int cnt = 0;
         while (bits.read1Bit() == 0 && cnt < 31)
             cnt++;
@@ -43,7 +41,7 @@ public class CAVLCReader {
         return res;
     }
 
-    public static int readUE(InBits bits, String message) throws IOException {
+    public static int readUE(BitReader bits, String message)  {
         int res = readUE(bits);
 
         trace(message, String.valueOf(res));
@@ -51,7 +49,7 @@ public class CAVLCReader {
         return res;
     }
 
-    public static int readSE(InBits bits, String message) throws IOException {
+    public static int readSE(BitReader bits, String message)  {
         int val = readUE(bits);
 
         int sign = ((val & 0x1) << 1) - 1;
@@ -62,7 +60,7 @@ public class CAVLCReader {
         return val;
     }
 
-    public static boolean readBool(InBits bits, String message) throws IOException {
+    public static boolean readBool(BitReader bits, String message)  {
 
         boolean res = bits.read1Bit() == 0 ? false : true;
 
@@ -71,29 +69,29 @@ public class CAVLCReader {
         return res;
     }
 
-    public static int readU(InBits bits, int i, String string) throws IOException {
+    public static int readU(BitReader bits, int i, String string)  {
         return (int) readNBit(bits, i, string);
     }
 
-    public static boolean readAE(InBits bits) {
+    public static boolean readAE(BitReader bits) {
         throw new UnsupportedOperationException("Unsupported");
     }
 
-    public static int readTE(InBits bits, int max) throws IOException {
+    public static int readTE(BitReader bits, int max)  {
         if (max > 1)
             return readUE(bits);
         return ~bits.read1Bit() & 0x1;
     }
 
-    public static int readAEI(InBits bits) {
+    public static int readAEI(BitReader bits) {
         throw new UnsupportedOperationException("Unsupported");
     }
 
-    public static int readME(InBits bits, String string) throws IOException {
+    public static int readME(BitReader bits, String string)  {
         return readUE(bits, string);
     }
 
-    public static Object readCE(InBits bits, BTree bt, String message) throws IOException {
+    public static Object readCE(BitReader bits, BTree bt, String message)  {
         while (true) {
             int bit = bits.read1Bit();
             bt = bt.down(bit);
@@ -108,7 +106,7 @@ public class CAVLCReader {
         }
     }
 
-    public static int readZeroBitCount(InBits bits, String message) throws IOException {
+    public static int readZeroBitCount(BitReader bits, String message)  {
         int count = 0;
         while (bits.read1Bit() == 0 && count < 32)
             count++;
@@ -118,12 +116,12 @@ public class CAVLCReader {
         return count;
     }
 
-    public static void readTrailingBits(InBits bits) throws IOException {
+    public static void readTrailingBits(BitReader bits)  {
         bits.read1Bit();
         bits.align();
     }
 
-    public static boolean moreRBSPData(InBits bits) throws IOException {
+    public static boolean moreRBSPData(BitReader bits)  {
         if (!bits.moreData())
             return false;
         int bitsRem = 8 - bits.curBit();

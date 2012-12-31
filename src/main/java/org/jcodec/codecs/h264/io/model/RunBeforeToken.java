@@ -2,10 +2,8 @@ package org.jcodec.codecs.h264.io.model;
 
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readCE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.BTree;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org )
@@ -41,8 +39,8 @@ public class RunBeforeToken {
         }
     }
 
-    public static int read(InBits in, int zeros_left)
-            throws IOException {
+    public static int read(BitReader in, int zeros_left)
+             {
         if (zeros_left > 7)
             zeros_left = 7;
         Object value = readCE(in, btrees[zeros_left - 1], "Luma run");

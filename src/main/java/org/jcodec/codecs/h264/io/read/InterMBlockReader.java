@@ -3,8 +3,6 @@ package org.jcodec.codecs.h264.io.read;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.Inter8x8Prediction;
 import org.jcodec.codecs.h264.io.model.InterPrediction;
@@ -17,7 +15,7 @@ import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.MBlockWithResidual;
 import org.jcodec.codecs.h264.io.model.SliceType;
 import org.jcodec.codecs.h264.io.model.SubMBType;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -58,8 +56,8 @@ public class InterMBlockReader extends CodedMblockReader {
         inter8x8PredictionReader = new Inter8x8PredictionReader(numRefIdxL0Active, numRefIdxL1Active);
     }
 
-    public MBlockInter8x8 readMBlockInter8x8(InBits reader, MBlockNeighbourhood neighbourhood, int mb_type,
-            SliceType sliceType, boolean mb_field_decoding_flag) throws IOException {
+    public MBlockInter8x8 readMBlockInter8x8(BitReader reader, MBlockNeighbourhood neighbourhood, int mb_type,
+            SliceType sliceType, boolean mb_field_decoding_flag)  {
 
         Inter8x8Prediction prediction = inter8x8PredictionReader.read(reader, mb_type, sliceType,
                 mb_field_decoding_flag);
@@ -87,7 +85,7 @@ public class InterMBlockReader extends CodedMblockReader {
                 prediction);
     }
 
-    public MBlockBDirect16x16 readMBlockBDirect(InBits reader, MBlockNeighbourhood neighbourhood) throws IOException {
+    public MBlockBDirect16x16 readMBlockBDirect(BitReader reader, MBlockNeighbourhood neighbourhood)  {
         int codedBlockPattern = readCodedBlockPattern(reader);
         int codedBlockPatternLuma = codedBlockPattern % 16;
 
@@ -101,8 +99,8 @@ public class InterMBlockReader extends CodedMblockReader {
         return new MBlockBDirect16x16(mb);
     }
 
-    public MBlockInter readMBlockInter(InBits reader, MBlockNeighbourhood neighbourhood, int numPartitions,
-            MBPartPredMode[] predMode, boolean mb_field_decoding_flag, Type type) throws IOException {
+    public MBlockInter readMBlockInter(BitReader reader, MBlockNeighbourhood neighbourhood, int numPartitions,
+            MBPartPredMode[] predMode, boolean mb_field_decoding_flag, Type type)  {
         InterPrediction interPrediction = interPredictionReader.read(reader, numPartitions, mb_field_decoding_flag,
                 predMode);
 
@@ -120,7 +118,7 @@ public class InterMBlockReader extends CodedMblockReader {
 
     }
 
-    protected int readCodedBlockPattern(InBits reader) throws IOException {
+    protected int readCodedBlockPattern(BitReader reader)  {
         int val = readUE(reader, "coded_block_pattern");
         return getCodedBlockPatternMapping()[val];
     }

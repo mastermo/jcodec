@@ -59,14 +59,18 @@ public class Buffer {
     }
 
     public final int search(byte... param) {
-        for (int i = pos; i < limit - param.length + 1; i++) {
-            if (buffer[i] == param[0]) {
+        return search(buffer, pos, limit, param);
+    }
+
+    public static int search(byte[] array, int off, int limit, byte... param) {
+        for (int i = off; i < limit - param.length + 1; i++) {
+            if (array[i] == param[0]) {
                 int j = 1;
                 for (; j < param.length; j++)
-                    if (buffer[i + j] != param[j])
+                    if (array[i + j] != param[j])
                         break;
                 if (j == param.length)
-                    return i - pos;
+                    return i - off;
             }
         }
         return -1;
@@ -106,7 +110,7 @@ public class Buffer {
         InputStream is = null;
         try {
             is = new FileInputStream(file);
-            return fetchFrom(is, (int)len);
+            return fetchFrom(is, (int) len);
         } finally {
             IOUtils.closeQuietly(is);
         }
@@ -309,5 +313,40 @@ public class Buffer {
 
     public Buffer flip() {
         return new Buffer(buffer, 0, pos);
+    }
+
+    public int readInt() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public short readShort() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public byte readByte() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public void skipBytes(int i) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public void readFully(byte[] sig) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public void writeShort(int length) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public void write(byte[] bs) {
+        // TODO Auto-generated method stub
+
     }
 }

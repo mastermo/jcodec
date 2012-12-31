@@ -17,14 +17,12 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readTE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.Inter8x8Prediction;
 import org.jcodec.codecs.h264.io.model.MBPartPredMode;
 import org.jcodec.codecs.h264.io.model.SliceType;
 import org.jcodec.codecs.h264.io.model.SubMBType;
 import org.jcodec.codecs.h264.io.model.Vector;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -52,8 +50,8 @@ public class Inter8x8PredictionReader {
             L0_4x4, L1_4x4, Bi_4x4 };
     SubMBType[] pMapping = { L0_8x8, L0_8x4, L0_4x8, L0_4x4 };
 
-    public Inter8x8Prediction read(InBits reader, int mb_type, SliceType sliceType, boolean mb_field_decoding_flag)
-            throws IOException {
+    public Inter8x8Prediction read(BitReader reader, int mb_type, SliceType sliceType, boolean mb_field_decoding_flag)
+             {
 
         SubMBType[] subMbTypes = new SubMBType[4];
         for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
@@ -63,7 +61,7 @@ public class Inter8x8PredictionReader {
             else if (sliceType == SliceType.P)
                 subMbTypes[mbPartIdx] = pMapping[subMbTypeCode];
             else
-                throw new IOException("Invalid bitstream: slicetype should be B or P for inter prediction");
+                throw new RuntimeException("Invalid bitstream: slicetype should be B or P for inter prediction");
         }
 
         int[] refIdxL0 = new int[4];

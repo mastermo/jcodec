@@ -10,17 +10,11 @@ import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeSE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeTrailingBits;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeUE;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
-import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.jcodec.codecs.h264.io.read.CAVLCReader;
-import org.jcodec.common.io.BitstreamReader;
-import org.jcodec.common.io.BitstreamWriter;
-import org.jcodec.common.io.InBits;
-import org.jcodec.common.io.OutBits;
+import org.jcodec.common.io.BitReader;
+import org.jcodec.common.io.BitWriter;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -70,8 +64,8 @@ public class SeqParameterSet extends BitstreamElement {
     public ScalingMatrix scalingMatrix;
     public int num_ref_frames_in_pic_order_cnt_cycle;
 
-    public static SeqParameterSet read(InputStream is) throws IOException {
-        InBits in = new BitstreamReader(is);
+    public static SeqParameterSet read(ByteBuffer is) {
+        BitReader in = new BitReader(is);
         SeqParameterSet sps = new SeqParameterSet();
 
         sps.profile_idc = readNBit(in, 8, "SPS: profile_idc");
@@ -137,7 +131,7 @@ public class SeqParameterSet extends BitstreamElement {
         return sps;
     }
 
-    private static void readScalingListMatrix(InBits in, SeqParameterSet sps) throws IOException {
+    private static void readScalingListMatrix(BitReader in, SeqParameterSet sps) {
         sps.scalingMatrix = new ScalingMatrix();
         for (int i = 0; i < 8; i++) {
             boolean seqScalingListPresentFlag = readBool(in, "SPS: seqScalingListPresentFlag");
@@ -153,7 +147,7 @@ public class SeqParameterSet extends BitstreamElement {
         }
     }
 
-    private static VUIParameters readVUIParameters(InBits in) throws IOException {
+    private static VUIParameters readVUIParameters(BitReader in) {
         VUIParameters vuip = new VUIParameters();
         vuip.aspect_ratio_info_present_flag = readBool(in, "VUI: aspect_ratio_info_present_flag");
         if (vuip.aspect_ratio_info_present_flag) {
@@ -215,7 +209,7 @@ public class SeqParameterSet extends BitstreamElement {
         return vuip;
     }
 
-    private static HRDParameters readHRDParameters(InBits in) throws IOException {
+    private static HRDParameters readHRDParameters(BitReader in) {
         HRDParameters hrd = new HRDParameters();
         hrd.cpb_cnt_minus1 = readUE(in, "SPS: cpb_cnt_minus1");
         hrd.bit_rate_scale = (int) readNBit(in, 4, "HRD: bit_rate_scale");
@@ -237,8 +231,8 @@ public class SeqParameterSet extends BitstreamElement {
         return hrd;
     }
 
-    public void write(OutputStream out) throws IOException {
-        OutBits writer = new BitstreamWriter(out);
+    public void write(ByteBuffer out) {
+        BitWriter writer = new BitWriter(out);
 
         writeNBit(writer, profile_idc, 8, "SPS: profile_idc");
         writeBool(writer, constraint_set_0_flag, "SPS: constraint_set_0_flag");
@@ -309,7 +303,7 @@ public class SeqParameterSet extends BitstreamElement {
         writeTrailingBits(writer);
     }
 
-    private void writeVUIParameters(VUIParameters vuip, OutBits writer) throws IOException {
+    private void writeVUIParameters(VUIParameters vuip, BitWriter writer) {
         writeBool(writer, vuip.aspect_ratio_info_present_flag, "VUI: aspect_ratio_info_present_flag");
         if (vuip.aspect_ratio_info_present_flag) {
             writeNBit(writer, vuip.aspect_ratio.getValue(), 8, "VUI: aspect_ratio");
@@ -372,7 +366,7 @@ public class SeqParameterSet extends BitstreamElement {
 
     }
 
-    private void writeHRDParameters(HRDParameters hrd, OutBits writer) throws IOException {
+    private void writeHRDParameters(HRDParameters hrd, BitWriter writer) {
         writeUE(writer, hrd.cpb_cnt_minus1, "HRD: cpb_cnt_minus1");
         writeNBit(writer, hrd.bit_rate_scale, 4, "HRD: bit_rate_scale");
         writeNBit(writer, hrd.cpb_size_scale, 4, "HRD: cpb_size_scale");
@@ -390,12 +384,9 @@ public class SeqParameterSet extends BitstreamElement {
     }
 
     public SeqParameterSet copy() {
-        try {
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            write(bytes);
-            return read(new ByteArrayInputStream(bytes.toByteArray()));
-        } catch (IOException e) {
-            return null;
-        }
+        ByteBuffer buf = ByteBuffer.allocate(2048);
+        write(buf);
+        buf.flip();
+        return read(buf);
     }
 }

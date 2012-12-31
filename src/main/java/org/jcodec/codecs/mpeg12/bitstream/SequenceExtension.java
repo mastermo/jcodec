@@ -2,7 +2,7 @@ package org.jcodec.codecs.mpeg12.bitstream;
 
 import java.io.IOException;
 
-import org.jcodec.common.io.BitstreamReaderBB;
+import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.InBits;
 import org.jcodec.common.io.OutBits;
 
@@ -30,7 +30,7 @@ public class SequenceExtension {
     public int frame_rate_extension_n;
     public int frame_rate_extension_d;
 
-    public static SequenceExtension read(BitstreamReaderBB in) {
+    public static SequenceExtension read(BitReader in) {
         SequenceExtension se = new SequenceExtension();
         se.profile_and_level = in.readNBit(8);
         se.progressive_sequence = in.read1Bit();

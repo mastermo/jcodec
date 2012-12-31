@@ -3,12 +3,10 @@ package org.jcodec.codecs.h264.io.read;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readTE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.InterPrediction;
 import org.jcodec.codecs.h264.io.model.MBPartPredMode;
 import org.jcodec.codecs.h264.io.model.Vector;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -30,8 +28,8 @@ public class InterPredictionReader {
         this.numRefIdxL1Active = numRefIdxL1Active;
     }
 
-    public InterPrediction read(InBits reader, int numPartitions, boolean mb_field_decoding_flag,
-            MBPartPredMode[] predMode) throws IOException {
+    public InterPrediction read(BitReader reader, int numPartitions, boolean mb_field_decoding_flag,
+            MBPartPredMode[] predMode) {
         int[] refIdxL0 = new int[numPartitions];
         for (int mbPartIdx = 0; mbPartIdx < numPartitions; mbPartIdx++) {
             if ((numRefIdxL0Active > 1 || mb_field_decoding_flag) && predMode[mbPartIdx] != MBPartPredMode.Pred_L1) {

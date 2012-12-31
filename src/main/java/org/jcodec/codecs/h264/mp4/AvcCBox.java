@@ -1,10 +1,9 @@
 package org.jcodec.codecs.h264.mp4;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,6 +11,7 @@ import org.jcodec.codecs.h264.StreamParams;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.wav.StringReader;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.io.ReaderBE;
 import org.jcodec.containers.mp4.boxes.Box;
 import org.jcodec.containers.mp4.boxes.Header;
@@ -61,7 +61,7 @@ public class AvcCBox extends Box implements StreamParams {
             int spsSize = (int) ReaderBE.readInt16(input);
             byte[] sps = new byte[spsSize];
             input.read(sps);
-            spsList.add(SeqParameterSet.read(new ByteArrayInputStream(sps, 1, spsSize - 1)));
+            spsList.add(SeqParameterSet.read(ByteBuffer.wrap(sps, 1, spsSize - 1)));
         }
 
         int nPPS = input.read() & 0xff;
@@ -69,7 +69,7 @@ public class AvcCBox extends Box implements StreamParams {
             int ppsSize = (int) ReaderBE.readInt16(input);
             byte[] pps = new byte[ppsSize];
             input.read(pps);
-            ppsList.add(PictureParameterSet.read(new ByteArrayInputStream(pps, 1, ppsSize - 1)));
+            ppsList.add(PictureParameterSet.read(ByteBuffer.wrap(pps, 1, ppsSize - 1)));
         }
     }
 
@@ -98,16 +98,18 @@ public class AvcCBox extends Box implements StreamParams {
         }
     }
 
-    private static byte[] toByteArray(SeqParameterSet sps) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+    private static byte[] toByteArray(SeqParameterSet sps) {
+        ByteBuffer out = ByteBuffer.allocate(1024);
         sps.write(out);
-        return out.toByteArray();
+        out.flip();
+        return ByteBufferUtil.toArray(out);
     }
 
-    private static byte[] toByteArray(PictureParameterSet pps) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+    private static byte[] toByteArray(PictureParameterSet pps) {
+        ByteBuffer out = ByteBuffer.allocate(1024);
         pps.write(out);
-        return out.toByteArray();
+        out.flip();
+        return ByteBufferUtil.toArray(out);
     }
 
     public List<SeqParameterSet> getSpsList() {

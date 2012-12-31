@@ -4,6 +4,7 @@ import static org.jcodec.common.JCodecUtil.bufin;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,7 +78,7 @@ public class JCodecPacketSource {
             }
         }
 
-        public Packet getPacket(byte[] buffer) {
+        public Packet getPacket(ByteBuffer buffer) {
             try {
                 return track.getFrames(buffer, framesPerPkt);
             } catch (IOException e) {

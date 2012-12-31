@@ -1,14 +1,12 @@
 package org.jcodec.codecs.h264;
 
-import java.io.ByteArrayInputStream;
+import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBlockIPCM;
-import org.jcodec.codecs.h264.io.read.CAVLCReader;
 import org.jcodec.codecs.h264.io.read.IPCMMblockReader;
 import org.jcodec.codecs.util.BinUtil;
-import org.jcodec.common.io.BitstreamReader;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 public class TestMBlockIPCM extends JAVCTestCase {
 
@@ -57,7 +55,7 @@ public class TestMBlockIPCM extends JAVCTestCase {
 				+ "10000100 10000101 10000000 10000001 10000011 10000011 10000101 10000101 10000101"
 				+ "10000101 10000001 10000011 10000100 10000101 10000101 10000101 10000101 10000101";
 
-		InBits reader = new BitstreamReader(new ByteArrayInputStream(BinUtil
+		BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil
 				.binaryStringToBytes(bits)));
 
 		IPCMMblockReader mblockReader = new IPCMMblockReader(

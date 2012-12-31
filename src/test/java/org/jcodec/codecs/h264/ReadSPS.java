@@ -1,7 +1,7 @@
 package org.jcodec.codecs.h264;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
@@ -28,7 +28,7 @@ public class ReadSPS {
 
     private static void printSPS(short[] sps) throws IOException {
 
-        SeqParameterSet cc = SeqParameterSet.read(new ByteArrayInputStream(byteArray(sps)));
+        SeqParameterSet cc = SeqParameterSet.read(ByteBuffer.wrap(byteArray(sps)));
 
         // Gson gson = new GsonBuilder().setPrettyPrinting().create();
         // System.out.println(gson.toJson(cc));
@@ -36,7 +36,7 @@ public class ReadSPS {
 
     private static void printPPS(short[] pps) throws IOException {
 
-        PictureParameterSet cc = PictureParameterSet.read(new ByteArrayInputStream(byteArray(pps)));
+        PictureParameterSet cc = PictureParameterSet.read(ByteBuffer.wrap(byteArray(pps)));
 
         // Gson gson = new GsonBuilder().setPrettyPrinting().create();
         // System.out.println(gson.toJson(cc));

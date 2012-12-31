@@ -1,9 +1,10 @@
 package org.jcodec.common;
 
+
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 
 import javax.imageio.ImageIO;
 
@@ -12,7 +13,6 @@ import org.jcodec.codecs.pcm.PCMDecoder;
 import org.jcodec.codecs.ppm.PPMEncoder;
 import org.jcodec.codecs.prores.ProresDecoder;
 import org.jcodec.codecs.s302.S302MDecoder;
-import org.jcodec.common.io.Buffer;
 import org.jcodec.common.io.BufferedRAInputStream;
 import org.jcodec.common.io.FileRAInputStream;
 import org.jcodec.common.io.MappedRAInputStream;
@@ -20,15 +20,12 @@ import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 import org.jcodec.containers.mp4.MP4Demuxer;
-import org.jcodec.containers.mp4.MP4Packet;
-import org.jcodec.containers.mp4.MP4Demuxer.DemuxerTrack;
 import org.jcodec.containers.mps.MPSDemuxer;
 import org.jcodec.containers.mps.MTSDemuxer;
 import org.jcodec.player.filters.MediaInfo;
 import org.jcodec.scale.AWTUtil;
 import org.jcodec.scale.ColorUtil;
 import org.jcodec.scale.Transform;
-import org.jcodec.scale.Yuv420pToRgb;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -46,20 +43,13 @@ public class JCodecUtil {
     }
 
     public static Format detectFormat(File f) throws IOException {
-        RandomAccessFile ff = null;
-        try {
-            ff = new RandomAccessFile(f, "r");
-            return detectFormat(Buffer.fetchFrom(ff, 200 * 1024));
-        } finally {
-            if (ff != null)
-                ff.close();
-        }
+        return detectFormat(ByteBufferUtil.fetchFrom(f, 200 * 1024));
     }
 
-    public static Format detectFormat(Buffer b) {
-        int movScore = MP4Demuxer.probe(b.fork());
-        int psScore = MPSDemuxer.probe(b.fork());
-        int tsScore = MTSDemuxer.probe(b.fork());
+    public static Format detectFormat(ByteBuffer b) {
+        int movScore = MP4Demuxer.probe(b.duplicate());
+        int psScore = MPSDemuxer.probe(b.duplicate());
+        int tsScore = MTSDemuxer.probe(b.duplicate());
 
         if (movScore == 0 && psScore == 0 && tsScore == 0)
             return null;
@@ -68,7 +58,7 @@ public class JCodecUtil {
                 : (psScore > tsScore ? Format.MPEG_PS : Format.MPEG_TS);
     }
 
-    public static VideoDecoder detectDecoder(Buffer b) {
+    public static VideoDecoder detectDecoder(ByteBuffer b) {
         int maxProbe = 0;
         VideoDecoder selected = null;
         for (VideoDecoder vd : knownDecoders) {

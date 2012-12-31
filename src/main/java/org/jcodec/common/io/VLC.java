@@ -1,12 +1,9 @@
 package org.jcodec.common.io;
 
-import static junit.framework.Assert.assertTrue;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.IOException;
 import java.io.PrintStream;
-
-import junit.framework.Assert;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -83,7 +80,7 @@ public class VLC {
         return tableEnd;
     }
 
-    public int readVLC(InBits in) throws IOException {
+    public int readVLC(BitReader in) {
 
         int code = 0, len = 0, overall = 0;
         for (int i = 0; len == 0; i++) {
@@ -111,7 +108,7 @@ public class VLC {
         return new String(symb);
     }
 
-    public void writeVLC(OutBits out, int code) throws IOException {
+    public void writeVLC(BitWriter out, int code) {
         out.writeNBit(codes[code] >>> (32 - codeSizes[code]), codeSizes[code]);
     }
 

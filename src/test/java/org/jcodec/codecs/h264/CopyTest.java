@@ -1,31 +1,26 @@
 package org.jcodec.codecs.h264;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel.MapMode;
 
 import junit.framework.Assert;
 
 import org.apache.commons.io.IOUtils;
-import org.jcodec.codecs.h264.annexb.NALUnitReader;
+import org.jcodec.codecs.h264.annexb.H264Utils;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
-import org.jcodec.codecs.h264.io.write.CAVLCWriter;
 import org.jcodec.codecs.h264.io.write.NALUnitWriter;
 import org.jcodec.codecs.h264.io.write.SliceHeaderWriter;
-import org.jcodec.codecs.h264.io.write.WritableTransportUnit;
-import org.jcodec.common.io.BitstreamReader;
-import org.jcodec.common.io.BitstreamWriter;
-import org.jcodec.common.io.InBits;
-import org.jcodec.common.io.OutBits;
+import org.jcodec.common.io.BitReader;
+import org.jcodec.common.io.BitWriter;
 
 public class CopyTest {
     private static SeqParameterSet sps;
@@ -36,49 +31,47 @@ public class CopyTest {
             System.out.println("Syntax: <in> <out>");
             System.exit(-1);
         }
-        InputStream is = null;
-        OutputStream os = null;
+        FileInputStream is = null;
+        FileOutputStream os = null;
         try {
-            is = new BufferedInputStream(new FileInputStream(args[0]));
-            os = new BufferedOutputStream(new FileOutputStream(args[1]));
+            File in = new File(args[0]);
+            is = new FileInputStream(in);
+            os = new FileOutputStream(args[1]);
 
-            NALUnitWriter out = new NALUnitWriter(os);
-            NALUnitReader in1 = new NALUnitReader(is);
+            NALUnitWriter out = new NALUnitWriter(os.getChannel());
+            MappedByteBuffer map = is.getChannel().map(MapMode.READ_ONLY, 0, in.length());
 
             SliceHeaderReader reader = null;
             SliceHeaderWriter writer = null;
-            InputStream nus;
-            while ((nus = in1.nextNALUnit()) != null) {
+            ByteBuffer nus;
+            while ((nus = H264Utils.nextNALUnit(map)) != null) {
                 NALUnit nu = NALUnit.read(nus);
                 if (nu.type == NALUnitType.SPS) {
-                    WritableTransportUnit ounit = out.writeUnit(nu);
+                    ByteBuffer buf = ByteBuffer.allocate(1024);
                     sps = SeqParameterSet.read(nus);
                     sps.seq_parameter_set_id = 1;
-                    sps.write(ounit.getOutputStream());
+                    sps.write(buf);
+                    buf.flip();
+                    out.writeUnit(nu, buf);
                     System.out.println("SPS");
                 } else if (nu.type == NALUnitType.PPS) {
-                    WritableTransportUnit ounit = out.writeUnit(nu);
+                    ByteBuffer buf = ByteBuffer.allocate(1024);
                     pps = PictureParameterSet.read(nus);
                     pps.seq_parameter_set_id = 1;
                     pps.pic_parameter_set_id = 1;
-                    pps.write(ounit.getOutputStream());
-                    reader = new SliceHeaderReader(new StreamParams() {
-                        public SeqParameterSet getSPS(int id) {
-                            return sps;
-                        }
-
-                        public PictureParameterSet getPPS(int id) {
-                            return pps;
-                        }
-                    });
+                    pps.write(buf);
+                    buf.flip();
+                    out.writeUnit(nu, buf);
+                    reader = new SliceHeaderReader();
                     writer = new SliceHeaderWriter(sps, pps);
                     System.out.println("PPS");
                 } else if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
-                    WritableTransportUnit ounit = out.writeUnit(nu);
-                    OutBits w = new BitstreamWriter(ounit.getOutputStream());
-                    InBits r = new BitstreamReader(nus);
-                    SliceHeader header = reader.read(nu, r);
+                    BitReader r = new BitReader(nus);
+                    SliceHeader header = reader.readPart1(r);
+                    reader.readPart2(header, nu, sps, pps, r);
                     header.pic_parameter_set_id = 1;
+                    ByteBuffer oo = ByteBuffer.allocate(nus.remaining() + 1024);
+                    BitWriter w = new BitWriter(oo);
                     writer.write(header, nu.type == NALUnitType.IDR_SLICE, nu.nal_ref_idc, w);
 
                     if (pps.entropy_coding_mode_flag) {
@@ -86,9 +79,10 @@ public class CopyTest {
                     } else {
                         copyCAVLC(w, r);
                     }
+                    oo.flip();
+                    out.writeUnit(nu, oo);
                 } else {
-                    WritableTransportUnit ounit = out.writeUnit(nu);
-                    IOUtils.copy(nus, ounit.getOutputStream());
+                    out.writeUnit(nu, nus);
                     System.out.println("OTHER");
                 }
             }
@@ -98,7 +92,7 @@ public class CopyTest {
         }
     }
 
-    private static void copyCAVLC(OutBits w, InBits r) throws IOException {
+    private static void copyCAVLC(BitWriter w, BitReader r) {
         int rem = 8 - r.curBit();
         int l = r.readNBit(rem);
         w.writeNBit(l, rem);
@@ -117,7 +111,7 @@ public class CopyTest {
         w.flush();
     }
 
-    private static void copyCABAC(OutBits w, InBits r) throws IOException {
+    private static void copyCABAC(BitWriter w, BitReader r) {
         long bp = r.curBit();
         long rem = r.readNBit(8 - (int) bp);
         Assert.assertEquals(rem, (1 << (8 - bp)) - 1);
@@ -127,13 +121,5 @@ public class CopyTest {
         int b;
         while ((b = r.readNBit(8)) != -1)
             w.writeNBit(b, 8);
-    }
-
-    private static boolean bum(byte[] orig, byte[] cool) {
-        for (int i = 0; i < cool.length; i++) {
-            if (cool[i] != orig[i])
-                return false;
-        }
-        return true;
     }
 }

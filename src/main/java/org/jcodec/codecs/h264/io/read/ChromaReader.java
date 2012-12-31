@@ -7,7 +7,7 @@ import org.jcodec.codecs.h264.io.model.CodedChroma;
 import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -44,7 +44,7 @@ public class ChromaReader {
         cabacReader = new ResidualCoeffsCABACReader();
     }
 
-    public CodedChroma readChroma(InBits reader, int pattern, MBlockNeighbourhood neighbourhood) throws IOException {
+    public CodedChroma readChroma(BitReader reader, int pattern, MBlockNeighbourhood neighbourhood)  {
 
         ResidualBlock cbDC = null;
         ResidualBlock crDC = null;
@@ -105,7 +105,7 @@ public class ChromaReader {
         return new BlocksWithTokens(blocks, tokens);
     }
 
-    private ResidualBlock readChromaDC(InBits reader) throws IOException {
+    private ResidualBlock readChromaDC(BitReader reader)  {
         ResidualBlock blk;
 
         if (!entropyCoding) {
@@ -119,7 +119,7 @@ public class ChromaReader {
         return blk;
     }
 
-    private BlocksWithTokens readChromaAC(InBits reader, CoeffToken[] left, CoeffToken[] top) throws IOException {
+    private BlocksWithTokens readChromaAC(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
 
         if (chromaFormat == ChromaFormat.YUV_444)
             return readChromaAC444(reader, left, top);
@@ -132,7 +132,7 @@ public class ChromaReader {
 
     }
 
-    private BlocksWithTokens readChromaAC444(InBits reader, CoeffToken[] left, CoeffToken[] top) throws IOException {
+    private BlocksWithTokens readChromaAC444(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
         CoeffToken[] pred = new CoeffToken[24];
         pred[16] = left[5];
         pred[17] = left[7];
@@ -147,7 +147,7 @@ public class ChromaReader {
 
     }
 
-    private BlocksWithTokens readChromaAC422(InBits reader, CoeffToken[] left, CoeffToken[] top) throws IOException {
+    private BlocksWithTokens readChromaAC422(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
 
         CoeffToken[] pred = new CoeffToken[14];
         pred[8] = left[5];
@@ -161,7 +161,7 @@ public class ChromaReader {
 
     }
 
-    private BlocksWithTokens readChromaAC420(InBits reader, CoeffToken[] left, CoeffToken[] top) throws IOException {
+    private BlocksWithTokens readChromaAC420(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
 
         CoeffToken[] pred = new CoeffToken[8];
         pred[4] = left != null ? left[1] : null;
@@ -172,8 +172,8 @@ public class ChromaReader {
         return readChromaACSub(reader, pred, 1, mappingLeft2x2, mappingTop2x2);
     }
 
-    private BlocksWithTokens readChromaACSub(InBits reader, CoeffToken[] pred, int NumC8x8, int[] mapLeft, int[] mapTop)
-            throws IOException {
+    private BlocksWithTokens readChromaACSub(BitReader reader, CoeffToken[] pred, int NumC8x8, int[] mapLeft, int[] mapTop)
+             {
 
         CoeffToken[] tokens = new CoeffToken[NumC8x8 * 4];
         ResidualBlock[] chromaACLevel = new ResidualBlock[NumC8x8 * 4];
@@ -193,7 +193,7 @@ public class ChromaReader {
         return new BlocksWithTokens(chromaACLevel, tokens);
     }
 
-    private ResidualBlock[] readChromaACCabac(InBits reader) throws IOException {
+    private ResidualBlock[] readChromaACCabac(BitReader reader)  {
 
         int NumC8x8 = 4 / (chromaFormat.getSubWidth() * chromaFormat.getSubHeight());
 

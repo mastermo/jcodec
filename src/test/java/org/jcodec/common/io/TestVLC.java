@@ -1,8 +1,7 @@
 package org.jcodec.common.io;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.h264.JAVCTestCase;
 import org.junit.Assert;
@@ -26,31 +25,33 @@ public class TestVLC extends JAVCTestCase {
         VLC vlc = new VLC(codes);
 
         for (int i = 0; i < codes.length; i++) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            BitstreamWriter out = new BitstreamWriter(baos);
+            ByteBuffer buf = ByteBuffer.allocate(1024);
+            BitWriter out = new BitWriter(buf);
             vlc.writeVLC(out, i);
             out.flush();
 
-            BitstreamReader in = new BitstreamReader(new ByteArrayInputStream(baos.toByteArray()));
+            buf.flip();
+            BitReader in = new BitReader(buf);
             int readVLC = vlc.readVLC(in);
 
             Assert.assertEquals(readVLC, i);
         }
     }
-    
+
     @Test
     public void testVLC2() throws IOException {
 
         VLC vlc = new VLC(codes);
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        BitstreamWriter out = new BitstreamWriter(baos);
+        ByteBuffer buf = ByteBuffer.allocate(1024);
+        
+        BitWriter out = new BitWriter(buf);
         for (int i = 0; i < codes.length; i++) {
             vlc.writeVLC(out, i);
         }
         out.flush();
-
-        BitstreamReader in = new BitstreamReader(new ByteArrayInputStream(baos.toByteArray()));
+        buf.flip();
+        
+        BitReader in = new BitReader(buf);
         for (int i = 0; i < codes.length; i++) {
             Assert.assertEquals(i, vlc.readVLC(in));
         }
@@ -66,16 +67,15 @@ public class TestVLC extends JAVCTestCase {
 
         VLC vlc = new VLC(codes);
 
-//        vlc.printTable();
-
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        BitstreamWriter bout = new BitstreamWriter(out);
+        // vlc.printTable();
+        ByteBuffer buf = ByteBuffer.allocate(1024);
+        BitWriter bout = new BitWriter(buf);
         for (int i : decoded) {
             vlc.writeVLC(bout, i);
         }
-
-        ByteArrayInputStream is = new ByteArrayInputStream(out.toByteArray());
-        BitstreamReader bis = new BitstreamReader(is);
+        buf.flip();
+        
+        BitReader bis = new BitReader(buf);
         int[] actual = new int[decoded.length];
         for (int i = 0; i < decoded.length; i++) {
             actual[i] = vlc.readVLC(bis);

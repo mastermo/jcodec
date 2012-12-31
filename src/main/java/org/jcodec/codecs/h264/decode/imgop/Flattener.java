@@ -63,13 +63,13 @@ public class Flattener {
                 cr.getBuf() }, YUV420);
     }
 
-    public static Picture flattern(DecodedMBlock[] decoded, int picWidthInMbs, int picHeightInMbs) {
-        int[] luma = new int[decoded.length << 8];
-        int stride = picWidthInMbs << 4;
+    public static void flattern(Picture tgt, DecodedMBlock[] decoded, int picWidthInMbs, int picHeightInMbs) {
+        int[] luma = tgt.getPlaneData(0);
+        int stride = tgt.getPlaneWidth(0);
 
-        int[] cb = new int[decoded.length << 6];
-        int[] cr = new int[decoded.length << 6];
-        int strideChroma = picWidthInMbs << 3;
+        int[] cb = tgt.getPlaneData(1);
+        int[] cr = tgt.getPlaneData(2);
+        int strideChroma = tgt.getPlaneWidth(1);
 
         for (int mbY = 0; mbY < picHeightInMbs; mbY++) {
             for (int mbX = 0; mbX < picWidthInMbs; mbX++) {
@@ -90,7 +90,5 @@ public class Flattener {
                 }
             }
         }
-
-        return new Picture(picWidthInMbs * 16, picHeightInMbs * 16, new int[][] { luma, cb, cr }, YUV420);
     }
 }

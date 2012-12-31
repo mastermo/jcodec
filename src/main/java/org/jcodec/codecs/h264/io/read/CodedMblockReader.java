@@ -2,15 +2,13 @@ package org.jcodec.codecs.h264.io.read;
 
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
 import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.MBlockWithResidual;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -42,8 +40,8 @@ public abstract class CodedMblockReader {
         chromaReader = new ChromaReader(chromaFormat, entropyCoding);
     }
 
-    public MBlockWithResidual readMBlockWithResidual(InBits in, MBlockNeighbourhood neighbourhood,
-            int codedBlockPattern, boolean transform8x8Used) throws IOException {
+    public MBlockWithResidual readMBlockWithResidual(BitReader in, MBlockNeighbourhood neighbourhood,
+            int codedBlockPattern, boolean transform8x8Used)  {
         int codedBlockPatternLuma = codedBlockPattern % 16;
         int codedBlockPatternChroma = codedBlockPattern / 16;
 
@@ -60,8 +58,8 @@ public abstract class CodedMblockReader {
         };
     }
 
-    private BlocksWithTokens readLumaNxN(InBits reader, MBlockNeighbourhood neighbourhood, boolean transform8x8Used,
-            int codedBlockPatternLuma) throws IOException {
+    private BlocksWithTokens readLumaNxN(BitReader reader, MBlockNeighbourhood neighbourhood, boolean transform8x8Used,
+            int codedBlockPatternLuma)  {
 
         if (entropyCoding) {
             ResidualBlock[] lumaBlock;
@@ -83,8 +81,8 @@ public abstract class CodedMblockReader {
         }
     }
 
-    protected BlocksWithTokens readResidualLuma8x8(InBits reader, MBlockNeighbourhood neighbourhood, int pattern)
-            throws IOException {
+    protected BlocksWithTokens readResidualLuma8x8(BitReader reader, MBlockNeighbourhood neighbourhood, int pattern)
+             {
 
         BlocksWithTokens luma4x4 = readResidualLuma4x4(reader, neighbourhood, pattern);
 
@@ -109,8 +107,8 @@ public abstract class CodedMblockReader {
         return luma4x4;
     }
 
-    protected BlocksWithTokens readResidualLuma4x4(InBits reader, MBlockNeighbourhood neighbourhood, int pattern)
-            throws IOException {
+    protected BlocksWithTokens readResidualLuma4x4(BitReader reader, MBlockNeighbourhood neighbourhood, int pattern)
+             {
         ResidualBlock[] lumaLevel = new ResidualBlock[16];
 
         CoeffToken[] lumaLeft = neighbourhood.getLumaLeft();
@@ -150,7 +148,7 @@ public abstract class CodedMblockReader {
         return new BlocksWithTokens(lumaLevel, tokens);
     }
 
-    protected ResidualBlock[] readResidualLuma4x4Cabac(InBits reader, int pattern) throws IOException {
+    protected ResidualBlock[] readResidualLuma4x4Cabac(BitReader reader, int pattern)  {
 
         ResidualBlock[] lumaLevel = new ResidualBlock[16];
 
@@ -165,7 +163,7 @@ public abstract class CodedMblockReader {
         return lumaLevel;
     }
 
-    protected ResidualBlock[] readResidualLuma8x8Cabac(InBits reader, int pattern) throws IOException {
+    protected ResidualBlock[] readResidualLuma8x8Cabac(BitReader reader, int pattern)  {
 
         ResidualBlock[] lumaLevel8x8 = new ResidualBlock[4];
 

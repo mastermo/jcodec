@@ -8,6 +8,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -16,7 +17,7 @@ import javax.sound.sampled.AudioFormat;
 
 import junit.framework.Assert;
 
-import org.jcodec.common.io.Buffer;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.io.RAOutputStream;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Rational;
@@ -181,7 +182,7 @@ public class MP4Muxer {
         protected Unit tgtChunkDurationUnit;
 
         protected long chunkDuration;
-        protected List<Buffer> curChunk = new ArrayList<Buffer>();
+        protected List<ByteBuffer> curChunk = new ArrayList<ByteBuffer>();
 
         protected List<SampleToChunkEntry> samplesInChunks = new ArrayList<SampleToChunkEntry>();
         protected int samplesInLastChunk = -1;
@@ -301,7 +302,7 @@ public class MP4Muxer {
             setTgtChunkDuration(new Rational(1, 2), Unit.SEC);
         }
 
-        public void addSamples(Buffer buffer) throws IOException {
+        public void addSamples(ByteBuffer buffer) throws IOException {
             curChunk.add(buffer);
 
             int frames = buffer.remaining() / frameSize;
@@ -331,8 +332,8 @@ public class MP4Muxer {
 
             chunkOffsets.add(out.getPos());
 
-            for (Buffer b : curChunk) {
-                b.writeTo(out);
+            for (ByteBuffer b : curChunk) {
+                ByteBufferUtil.writeTo(b, out);
             }
             curChunk.clear();
 
@@ -419,7 +420,7 @@ public class MP4Muxer {
         public void addTimecode(Packet packet) throws IOException {
             if (packet.isKeyFrame())
                 processGop();
-            gop.add(new Packet(packet, (Buffer) null));
+            gop.add(new Packet(packet, (ByteBuffer) null));
         }
 
         private void processGop() throws IOException {
@@ -517,10 +518,11 @@ public class MP4Muxer {
                     TimecodeSampleEntry tmcd = new TimecodeSampleEntry((firstTimecode.isDropFrame() ? 1 : 0),
                             timescale, (int) (sampleDuration / tcFrames), fpsEstimate);
                     sampleEntries.add(tmcd);
-                    Buffer sample = new Buffer(4);
-                    sample.dout().writeInt(toCounter(firstTimecode, fpsEstimate));
-                    addFrame(new MP4Packet(new Buffer(sample.buffer, 0, 4), samplePts, timescale, sampleDuration, 0,
-                            true, null, samplePts, sampleEntries.size() - 1));
+                    ByteBuffer sample = ByteBuffer.allocate(4);
+                    sample.putInt(toCounter(firstTimecode, fpsEstimate));
+                    sample.flip();
+                    addFrame(new MP4Packet(sample, samplePts, timescale, sampleDuration, 0, true, null, samplePts,
+                            sampleEntries.size() - 1));
 
                     lower.add(new Edit(sampleDuration, samplePts, 1.0f));
                 } else {
@@ -531,12 +533,12 @@ public class MP4Muxer {
 
         private int toCounter(TapeTimecode tc, int fps) {
             int frames = toSec(tc) * fps + tc.getFrame();
-            if(tc.isDropFrame()) {
+            if (tc.isDropFrame()) {
                 long D = frames / 18000;
                 long M = frames % 18000;
                 frames -= 18 * D + 2 * ((M - 2) / 1800);
             }
-            
+
             return frames;
         }
 
@@ -641,9 +643,9 @@ public class MP4Muxer {
 
             chunkOffsets.add(out.getPos());
 
-            for (Buffer bs : curChunk) {
+            for (ByteBuffer bs : curChunk) {
                 sampleSizes.add(bs.remaining());
-                bs.writeTo(out);
+                ByteBufferUtil.writeTo(bs, out);
             }
 
             if (samplesInLastChunk == -1 || samplesInLastChunk != curChunk.size()) {

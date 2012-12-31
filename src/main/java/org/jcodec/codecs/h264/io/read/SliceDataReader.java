@@ -6,7 +6,6 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readNBit;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,7 +20,7 @@ import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.Macroblock;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -61,7 +60,7 @@ public class SliceDataReader {
         this.constrainedIntraPred = constrainedIntraPred;
     }
 
-    public Macroblock[] read(InBits in, SliceHeader sh, MBlockMapper mBlockMap) throws IOException {
+    public Macroblock[] read(BitReader in, SliceHeader sh, MBlockMapper mBlockMap) {
 
         int numRefIdxL0ActiveForSlice = numRefIdxL0Active;
         if (sh.num_ref_idx_active_override_flag) {
@@ -77,8 +76,7 @@ public class SliceDataReader {
             return readCAVLC(in, sh, mBlockReader, mBlockMap);
     }
 
-    public Macroblock[] readCABAC(InBits in, SliceHeader sh, MBlockReader mBlockReader, MBlockMapper mBlockMap)
-            throws IOException {
+    public Macroblock[] readCABAC(BitReader in, SliceHeader sh, MBlockReader mBlockReader, MBlockMapper mBlockMap) {
 
         List<Macroblock> mblocks = new ArrayList<Macroblock>();
 
@@ -126,8 +124,7 @@ public class SliceDataReader {
         return mblocks.toArray(new Macroblock[] {});
     }
 
-    public Macroblock[] readCAVLC(InBits in, SliceHeader sh, MBlockReader mBlockReader, MBlockMapper mBlockMap)
-            throws IOException {
+    public Macroblock[] readCAVLC(BitReader in, SliceHeader sh, MBlockReader mBlockReader, MBlockMapper mBlockMap) {
 
         List<Macroblock> mblocks = new ArrayList<Macroblock>();
 

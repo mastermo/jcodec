@@ -2,7 +2,7 @@ package org.jcodec.codecs.mpeg12.bitstream;
 
 import java.io.IOException;
 
-import org.jcodec.common.io.BitstreamReaderBB;
+import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.InBits;
 import org.jcodec.common.io.OutBits;
 
@@ -24,7 +24,7 @@ public class SequenceDisplayExtension {
         int transfer_characteristics;
         int matrix_coefficients;
 
-        public static ColorDescription read(BitstreamReaderBB in) {
+        public static ColorDescription read(BitReader in) {
             ColorDescription cd = new ColorDescription();
             cd.colour_primaries = in.readNBit(8);
             cd.transfer_characteristics = in.readNBit(8);
@@ -39,7 +39,7 @@ public class SequenceDisplayExtension {
         }
     }
 
-    public static SequenceDisplayExtension read(BitstreamReaderBB in) {
+    public static SequenceDisplayExtension read(BitReader in) {
         SequenceDisplayExtension sde = new SequenceDisplayExtension();
         sde.video_format = in.readNBit(3);
         if (in.read1Bit() == 1) {

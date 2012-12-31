@@ -4,8 +4,6 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
 import org.jcodec.codecs.h264.io.model.CoeffToken;
@@ -15,7 +13,7 @@ import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.MBlockWithResidual;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -52,7 +50,7 @@ public class IntraMBlockReader extends CodedMblockReader {
         chromaReader = new ChromaReader(chromaFormat, entropyCoding);
     }
 
-    public MBlockIntraNxN readMBlockIntraNxN(InBits reader, MBlockNeighbourhood neighbourhood) throws IOException {
+    public MBlockIntraNxN readMBlockIntraNxN(BitReader reader, MBlockNeighbourhood neighbourhood)  {
         boolean transform8x8Used = false;
         if (transform8x8) {
             transform8x8Used = readBool(reader, "transform_size_8x8_flag");
@@ -73,8 +71,8 @@ public class IntraMBlockReader extends CodedMblockReader {
         return new MBlockIntraNxN(mb, prediction);
     }
 
-    public MBlockIntra16x16 readMBlockIntra16x16(InBits reader, MBlockNeighbourhood neighbourhood,
-            int lumaPredictionMode, int codedBlockPatternChroma, int codedBlockPatternLuma) throws IOException {
+    public MBlockIntra16x16 readMBlockIntra16x16(BitReader reader, MBlockNeighbourhood neighbourhood,
+            int lumaPredictionMode, int codedBlockPatternChroma, int codedBlockPatternLuma)  {
 
         CoeffToken[] pred = new CoeffToken[24];
         CoeffToken[] lumaLeft = neighbourhood.getLumaLeft();
@@ -128,7 +126,7 @@ public class IntraMBlockReader extends CodedMblockReader {
         return new MBlockIntra16x16(chroma, mbQPDelta, lumaDC, lumaAC, tokens, lumaPredictionMode, chromaPredictionMode);
     }
 
-    protected int readCodedBlockPattern(InBits reader) throws IOException {
+    protected int readCodedBlockPattern(BitReader reader)  {
         int val = readUE(reader, "coded_block_pattern");
         return getCodedBlockPatternMapping()[val];
     }

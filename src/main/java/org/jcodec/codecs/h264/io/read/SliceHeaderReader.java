@@ -8,10 +8,8 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 
-import java.io.IOException;
 import java.util.ArrayList;
 
-import org.jcodec.codecs.h264.StreamParams;
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
@@ -27,7 +25,7 @@ import org.jcodec.codecs.h264.io.model.RefPicReordering.ReorderOp;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.io.model.SliceType;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -39,13 +37,8 @@ import org.jcodec.common.io.InBits;
  * 
  */
 public class SliceHeaderReader {
-    private StreamParams streamParams;
 
-    public SliceHeaderReader(StreamParams demuxer) {
-        this.streamParams = demuxer;
-    }
-
-    public SliceHeader read(NALUnit nalUnit, InBits in) throws IOException {
+    public SliceHeader readPart1(BitReader in) {
 
         SliceHeader sh = new SliceHeader();
         sh.first_mb_in_slice = readUE(in, "SH: first_mb_in_slice");
@@ -54,10 +47,11 @@ public class SliceHeaderReader {
         sh.slice_type_restr = (sh_type / 5) > 0;
 
         sh.pic_parameter_set_id = readUE(in, "SH: pic_parameter_set_id");
+        
+        return sh;
+    }
 
-        PictureParameterSet pps = streamParams.getPPS(sh.pic_parameter_set_id);
-        SeqParameterSet sps = streamParams.getSPS(pps.seq_parameter_set_id);
-
+    public SliceHeader readPart2(SliceHeader sh, NALUnit nalUnit, SeqParameterSet sps, PictureParameterSet pps, BitReader in) {
         sh.pps = pps;
         sh.sps = sps;
 
@@ -148,7 +142,7 @@ public class SliceHeaderReader {
 
     static int i = 0;
 
-    private static void readDecoderPicMarking(NALUnit nalUnit, SliceHeader sh, InBits in) throws IOException {
+    private static void readDecoderPicMarking(NALUnit nalUnit, SliceHeader sh, BitReader in) {
         if (nalUnit.type == NALUnitType.IDR_SLICE) {
             boolean no_output_of_prior_pics_flag = readBool(in, "SH: no_output_of_prior_pics_flag");
             boolean long_term_reference_flag = readBool(in, "SH: long_term_reference_flag");
@@ -196,8 +190,7 @@ public class SliceHeaderReader {
         }
     }
 
-    private static void readPredWeightTable(SeqParameterSet sps, PictureParameterSet pps, SliceHeader sh, InBits in)
-            throws IOException {
+    private static void readPredWeightTable(SeqParameterSet sps, PictureParameterSet pps, SliceHeader sh, BitReader in) {
         sh.pred_weight_table = new PredictionWeightTable();
         sh.pred_weight_table.luma_log2_weight_denom = readUE(in, "SH: luma_log2_weight_denom");
         if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
@@ -258,7 +251,7 @@ public class SliceHeaderReader {
         }
     }
 
-    private static void readRefPicListReordering(SliceHeader sh, InBits in) throws IOException {
+    private static void readRefPicListReordering(SliceHeader sh, BitReader in) {
         System.out.println(i++);
         if (sh.slice_type.isInter()) {
             boolean ref_pic_list_reordering_flag_l0 = readBool(in, "SH: ref_pic_list_reordering_flag_l0");
@@ -274,7 +267,7 @@ public class SliceHeaderReader {
         }
     }
 
-    private static RefPicReordering readReorderingEntries(InBits in) throws IOException {
+    private static RefPicReordering readReorderingEntries(BitReader in) {
         ArrayList<ReorderOp> reordering = new ArrayList<ReorderOp>();
         int reordering_of_pic_nums_idc;
         do {

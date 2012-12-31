@@ -58,7 +58,8 @@ public interface Adapter {
         /**
          * Returns GOP id by frame number
          * 
-         * @return
+         * @return GOP id the frame belongs to or -1 in case such frame could
+         *         not be found
          */
         int gopId(int frameNo);
     }

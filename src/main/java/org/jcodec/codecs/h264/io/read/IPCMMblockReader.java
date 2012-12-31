@@ -1,10 +1,8 @@
 package org.jcodec.codecs.h264.io.read;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBlockIPCM;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -28,7 +26,7 @@ public class IPCMMblockReader {
         this.bitDepthChroma = bitDepthChroma;
     }
 
-    public MBlockIPCM readMBlockIPCM(InBits reader) throws IOException {
+    public MBlockIPCM readMBlockIPCM(BitReader reader)  {
         reader.align();
 
         int[] samplesLuma = new int[256];

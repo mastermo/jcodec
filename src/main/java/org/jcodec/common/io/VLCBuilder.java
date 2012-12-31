@@ -1,7 +1,5 @@
 package org.jcodec.common.io;
 
-import java.io.IOException;
-
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntIntHashMap;
 
@@ -44,11 +42,11 @@ public class VLCBuilder {
 
     public VLC getVLC() {
         return new VLC(codes.toArray(), codesSizes.toArray()) {
-            public int readVLC(InBits in) throws IOException {
+            public int readVLC(BitReader in) {
                 return inverse.get(super.readVLC(in));
             }
 
-            public void writeVLC(OutBits out, int code) throws IOException {
+            public void writeVLC(BitWriter out, int code) {
                 super.writeVLC(out, forward.get(code));
             }
         };

@@ -8,6 +8,7 @@ import static org.jcodec.containers.mps.MPSDemuxer.videoStream;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,7 +19,7 @@ import java.util.Set;
 import junit.framework.Assert;
 
 import org.apache.commons.io.IOUtils;
-import org.jcodec.common.io.Buffer;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.io.FileRAOutputStream;
 import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.io.ReaderBE;
@@ -83,16 +84,16 @@ public class MTSIndex {
 
     public static class StreamEntry {
         public int sid;
-        public List<Buffer> extraData;
+        public List<ByteBuffer> extraData;
         public List<FrameEntry> frames;
 
         private StreamEntry(int sid) {
             this.sid = sid;
-            this.extraData = new ArrayList<Buffer>(1);
+            this.extraData = new ArrayList<ByteBuffer>(1);
             this.frames = Collections.synchronizedList(new ArrayList<FrameEntry>(5000));
         }
 
-        public StreamEntry(int sid, List<Buffer> extraData, List<FrameEntry> frames) {
+        public StreamEntry(int sid, List<ByteBuffer> extraData, List<FrameEntry> frames) {
             this.sid = sid;
             this.extraData = extraData;
             this.frames = frames;
@@ -106,7 +107,7 @@ public class MTSIndex {
             return e;
         }
 
-        public VideoFrameEntry addVideo(long offset, long pts, int duration, Buffer ed, int gopId, int timecode,
+        public VideoFrameEntry addVideo(long offset, long pts, int duration, ByteBuffer ed, int gopId, int timecode,
                 short displayOrder, byte frameType) {
             if (ed != null && (extraData.size() == 0 || !ed.equals(extraData.get(extraData.size() - 1)))) {
                 extraData.add(ed);
@@ -175,7 +176,7 @@ public class MTSIndex {
         return stream.addAudio(offset, pts, duration);
     }
 
-    public VideoFrameEntry addVideo(int streamId, long offset, long pts, int duration, Buffer seqHeader, int gopId,
+    public VideoFrameEntry addVideo(int streamId, long offset, long pts, int duration, ByteBuffer seqHeader, int gopId,
             int timecode, short displayOrder, byte frameType) {
         StreamEntry stream = streams.get(streamId);
         if (stream == null) {
@@ -192,12 +193,12 @@ public class MTSIndex {
             List<StreamEntry> streams = new ArrayList<StreamEntry>();
             int nStreams = is.read();
             for (int i = 0; i < nStreams; i++) {
-                ArrayList<Buffer> extraData = new ArrayList<Buffer>();
+                ArrayList<ByteBuffer> extraData = new ArrayList<ByteBuffer>();
                 long size = readInt64(is);
                 long pos = is.getPos();
                 int sid = is.read();
                 while (is.read() == 0) {
-                    Buffer buffer = Buffer.fetchFrom(is, (int) readInt16(is));
+                    ByteBuffer buffer = ByteBufferUtil.fetchFrom(is, (int) readInt16(is));
                     extraData.add(buffer);
                 }
                 ArrayList<FrameEntry> frames = new ArrayList<FrameEntry>();
@@ -224,7 +225,7 @@ public class MTSIndex {
         }
     }
 
-    public Buffer getExtraData(int sid, int ind) {
+    public ByteBuffer getExtraData(int sid, int ind) {
         return streams.get(sid).extraData.get(ind);
     }
 
@@ -249,10 +250,10 @@ public class MTSIndex {
 
     private void writeStream(StreamEntry streamEntry, FileRAOutputStream out) throws IOException {
         out.writeByte(streamEntry.sid);
-        for (Buffer buffer : streamEntry.extraData) {
+        for (ByteBuffer buffer : streamEntry.extraData) {
             out.writeByte(0);
             out.writeShort(buffer.remaining());
-            buffer.writeTo(out);
+            ByteBufferUtil.writeTo(buffer, out);
         }
         out.writeByte(1);
         out.writeInt(streamEntry.frames.size());

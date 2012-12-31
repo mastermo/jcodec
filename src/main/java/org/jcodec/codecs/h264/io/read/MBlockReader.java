@@ -1,7 +1,5 @@
 package org.jcodec.codecs.h264.io.read;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBPartPredMode;
 import org.jcodec.codecs.h264.io.model.MBlockInter;
@@ -9,7 +7,7 @@ import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.Macroblock;
 import org.jcodec.codecs.h264.io.model.SliceType;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -35,8 +33,8 @@ public class MBlockReader {
         ipcmMblockReader = new IPCMMblockReader(chromaFormat, bitDepthLuma, bitDepthChroma);
     }
 
-    public Macroblock read(SliceType sliceType, int mbType, InBits reader, MBlockNeighbourhood neighbourhood,
-            boolean mbFieldDecodingFlag) throws IOException {
+    public Macroblock read(SliceType sliceType, int mbType, BitReader reader, MBlockNeighbourhood neighbourhood,
+            boolean mbFieldDecodingFlag)  {
 
         if (sliceType == SliceType.I) {
             return readMBlockI(mbType, reader, neighbourhood);
@@ -50,7 +48,7 @@ public class MBlockReader {
         return null;
     }
 
-    private Macroblock readMBlockI(int mbType, InBits reader, MBlockNeighbourhood neighbourhood) throws IOException {
+    private Macroblock readMBlockI(int mbType, BitReader reader, MBlockNeighbourhood neighbourhood)  {
         if (mbType == 0)
             return intraMBlockReader.readMBlockIntraNxN(reader, neighbourhood);
         else if (mbType >= 1 && mbType <= 24)
@@ -61,8 +59,8 @@ public class MBlockReader {
         return null;
     }
 
-    private Macroblock readMBlockP(int mbType, InBits reader, MBlockNeighbourhood neighbourhood,
-            boolean mbFieldDecodingFlag) throws IOException {
+    private Macroblock readMBlockP(int mbType, BitReader reader, MBlockNeighbourhood neighbourhood,
+            boolean mbFieldDecodingFlag)  {
         switch (mbType) {
         case 0:
             return interMBlockReader.readMBlockInter(reader, neighbourhood, 1,
@@ -84,8 +82,8 @@ public class MBlockReader {
         }
     }
 
-    private Macroblock readMBlockB(int mbType, InBits reader, MBlockNeighbourhood neighbourhood,
-            boolean mbFieldDecodingFlag) throws IOException {
+    private Macroblock readMBlockB(int mbType, BitReader reader, MBlockNeighbourhood neighbourhood,
+            boolean mbFieldDecodingFlag)  {
 
         switch (mbType) {
         case 0:
@@ -161,8 +159,8 @@ public class MBlockReader {
         }
     }
 
-    public MBlockIntra16x16 readMBlockIntra16x16(InBits reader, int mbType, MBlockNeighbourhood neighbourhood)
-            throws IOException {
+    public MBlockIntra16x16 readMBlockIntra16x16(BitReader reader, int mbType, MBlockNeighbourhood neighbourhood)
+             {
         switch (mbType) {
         case 1:
             return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 0, 0);

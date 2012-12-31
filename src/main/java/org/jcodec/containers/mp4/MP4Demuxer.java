@@ -4,13 +4,16 @@ import static org.jcodec.containers.mp4.QTTimeUtil.mediaToEdited;
 import static org.jcodec.containers.mp4.boxes.Box.findFirst;
 import gnu.trove.list.array.TIntArrayList;
 
-import java.io.DataInput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.jcodec.common.io.Buffer;
+import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.JCodecUtil;
 import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.model.RationalLarge;
 import org.jcodec.common.model.TapeTimecode;
@@ -133,7 +136,7 @@ public class MP4Demuxer {
             return timescale;
         }
 
-        public abstract MP4Packet getFrames(byte[] buffer, int n) throws IOException;
+        public abstract MP4Packet getFrames(ByteBuffer buffer, int n) throws IOException;
 
         public abstract MP4Packet getFrames(int n) throws IOException;
 
@@ -215,9 +218,9 @@ public class MP4Demuxer {
         public int getStartTimecode() throws IOException {
             if (!box.isTimecode())
                 throw new IllegalStateException("Not a timecode track");
-            MP4Packet nextFrame = getFrames(new byte[4], 1);
+            MP4Packet nextFrame = getFrames(ByteBuffer.allocate(4), 1);
             gotoFrame(0);
-            return nextFrame.getData().fork().dinp().readInt();
+            return nextFrame.getData().duplicate().getInt();
         }
 
         public int parseTimecode(String tc) {
@@ -294,10 +297,10 @@ public class MP4Demuxer {
         }
 
         public MP4Packet getFrames(int n) throws IOException {
-            return getFrames(new byte[n * getFrameSize()], n);
+            return getFrames(ByteBuffer.allocate(n * getFrameSize()), n);
         }
 
-        public synchronized MP4Packet getFrames(byte[] result, int n) throws IOException {
+        public synchronized MP4Packet getFrames(ByteBuffer _result, int n) throws IOException {
             if (n < 0)
                 throw new IllegalArgumentException("Negative number of frames");
 
@@ -307,39 +310,40 @@ public class MP4Demuxer {
                 return null;
             }
 
+            ByteBuffer result = _result.duplicate();
             int tgtLen = frameSize * n;
-            if (tgtLen > result.length) {
+            if (tgtLen > result.remaining()) {
                 throw new IllegalArgumentException("Insufficient room to fit " + n + " samples");
             }
+            ReadableByteChannel ch = Channels.newChannel(input);
 
             int se = sampleToChunks[stscInd].getEntry();
-            int rOff = 0;
             do {
                 long chSize = sampleToChunks[stscInd].getCount() * frameSize;
-                int toRead = (int) Math.min(tgtLen - rOff, chSize - posShift);
+                int toRead = (int) Math.min(result.remaining(), chSize - posShift);
                 int read;
                 synchronized (input) {
                     input.seek(chunkOffsets[stcoInd] + posShift);
-                    read = input.read(result, rOff, toRead);
+                    read = ByteBufferUtil.read(ch, result, toRead);
                 }
                 if (read == -1)
                     break;
-                rOff += read;
                 posShift += read;
 
                 if (posShift == chSize) {
                     nextChunk();
                     posShift = 0;
                 }
-            } while (rOff < tgtLen && stcoInd < chunkOffsets.length && sampleToChunks[stscInd].getEntry() == se);
+            } while (result.hasRemaining() && stcoInd < chunkOffsets.length && sampleToChunks[stscInd].getEntry() == se);
 
             long _pts = pts;
-            int doneFrames = rOff / frameSize;
+            int doneFrames = (tgtLen - result.remaining()) / frameSize;
             shiftPts(doneFrames);
 
-            MP4Packet pkt = new MP4Packet(new Buffer(result),
-                    QTTimeUtil.mediaToEdited(box, _pts, movie.getTimescale()), timescale, (int) (pts - _pts), curFrame,
-                    true, null, _pts, se - 1);
+            result.flip();
+
+            MP4Packet pkt = new MP4Packet(result, QTTimeUtil.mediaToEdited(box, _pts, movie.getTimescale()), timescale,
+                    (int) (pts - _pts), curFrame, true, null, _pts, se - 1);
 
             curFrame += doneFrames;
 
@@ -518,10 +522,10 @@ public class MP4Demuxer {
                 return null;
             int size = sizes[(int) curFrame];
 
-            return getFrames(new byte[size], 1);
+            return getFrames(ByteBuffer.allocate(size), 1);
         }
 
-        public synchronized MP4Packet getFrames(byte[] result, int n) throws IOException {
+        public synchronized MP4Packet getFrames(ByteBuffer _result, int n) throws IOException {
             if (n != 1)
                 throw new IllegalArgumentException("Frames should be = 1 for this track");
 
@@ -529,13 +533,16 @@ public class MP4Demuxer {
                 return null;
             int size = sizes[(int) curFrame];
 
-            if (result.length < size) {
+            if (_result.remaining() < size) {
                 throw new IllegalArgumentException("Buffer size is not enough to fit a packet");
             }
+            ByteBuffer result = _result.duplicate();
+            result.limit(size);
+            ReadableByteChannel ch = Channels.newChannel(input);
 
             synchronized (input) {
                 input.seek(chunkOffsets[stcoInd] + offInChunk);
-                if (input.read(result) < size)
+                if (ByteBufferUtil.read(ch, result) < size)
                     return null;
             }
 
@@ -558,8 +565,10 @@ public class MP4Demuxer {
                 }
             }
 
-            MP4Packet pkt = new MP4Packet(new Buffer(result), mediaToEdited(box, realPts, movie.getTimescale()),
-                    timescale, duration, curFrame, sync, null, realPts, sampleToChunks[stscInd].getEntry() - 1);
+            result.flip();
+
+            MP4Packet pkt = new MP4Packet(result, mediaToEdited(box, realPts, movie.getTimescale()), timescale,
+                    duration, curFrame, sync, null, realPts, sampleToChunks[stscInd].getEntry() - 1);
 
             offInChunk += size;
 
@@ -614,7 +623,7 @@ public class MP4Demuxer {
         tracks = new LinkedList<DemuxerTrack>();
         findMovieBox(input);
     }
-    
+
     public DemuxerTrack[] getTracks() {
         return tracks.toArray(new DemuxerTrack[] {});
     }
@@ -687,30 +696,25 @@ public class MP4Demuxer {
     private static int moov = ('m' << 24) | ('o' << 16) | ('o' << 8) | 'v';
     private static int mdat = ('m' << 24) | ('d' << 16) | ('a' << 8) | 't';
 
-    public static int probe(final Buffer b) {
-        Buffer fork = b.fork();
-        DataInput dinp = fork.dinp();
+    public static int probe(final ByteBuffer b) {
+        ByteBuffer fork = b.duplicate();
         int success = 0;
         int total = 0;
-        try {
-            while (fork.remaining() >= 8) {
-                long len = dinp.readInt();
-                int fcc = dinp.readInt();
-                int hdrLen = 8;
-                if (len == 1) {
-                    len = dinp.readLong();
-                    hdrLen = 16;
-                } else if (len < 8)
-                    break;
-                if (fcc == ftyp && len < 64 || fcc == moov && len < 100 * 1024 * 1024 || fcc == free || fcc == mdat)
-                    success++;
-                total++;
-                if (len >= Integer.MAX_VALUE)
-                    break;
-                fork.read((int) len - hdrLen);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        while (fork.remaining() >= 8) {
+            long len = fork.getInt();
+            int fcc = fork.getInt();
+            int hdrLen = 8;
+            if (len == 1) {
+                len = fork.getLong();
+                hdrLen = 16;
+            } else if (len < 8)
+                break;
+            if (fcc == ftyp && len < 64 || fcc == moov && len < 100 * 1024 * 1024 || fcc == free || fcc == mdat)
+                success++;
+            total++;
+            if (len >= Integer.MAX_VALUE)
+                break;
+            ByteBufferUtil.skip(fork, (int) (len - hdrLen));
         }
 
         return success * 100 / total;

@@ -1,23 +1,18 @@
 package org.jcodec.samples.mux;
 
-import java.io.BufferedInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.output.ByteArrayOutputStream;
-import org.jcodec.codecs.h264.annexb.NALUnitReader;
+import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.io.Buffer;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.io.FileRAOutputStream;
 import org.jcodec.common.io.RAOutputStream;
 import org.jcodec.common.model.Size;
@@ -30,6 +25,9 @@ import org.jcodec.containers.mp4.boxes.SampleEntry;
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
+ * 
+ * Sample code. Muxes H.264 ( MPEG4 AVC ) elementary stream into MP4 ( ISO
+ * 14496-1/14496-12/14496-14, Quicktime ) container
  * 
  * @author Jay Codec
  * 
@@ -69,42 +67,34 @@ public class AVCMP4Mux {
 
     private static void mux(CompressedTrack track, File f, List<SeqParameterSet> spsList,
             List<PictureParameterSet> ppsList) throws IOException {
-        InputStream is = null;
-        try {
-            is = new BufferedInputStream(new FileInputStream(f));
-            NALUnitReader in = new NALUnitReader(is);
-            InputStream nextNALUnit = null;
-            int i = 0;
-            do {
-                nextNALUnit = in.nextNALUnit();
-                if (nextNALUnit == null)
-                    continue;
-                NALUnit nu = NALUnit.read(nextNALUnit);
-                if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
+        MappedH264ES es = new MappedH264ES(ByteBufferUtil.map(f));
 
-                    track.addFrame(new MP4Packet(formPacket(nu, nextNALUnit), i, 25, 1, i,
-                            nu.type == NALUnitType.IDR_SLICE, null, i, 0));
-                    i++;
-                } else if (nu.type == NALUnitType.SPS) {
-                    spsList.add(SeqParameterSet.read(nextNALUnit));
-                } else if (nu.type == NALUnitType.PPS) {
-                    ppsList.add(PictureParameterSet.read(nextNALUnit));
-                } else {
-                    nextNALUnit.skip(Integer.MAX_VALUE);
-                }
-            } while (nextNALUnit != null);
-        } finally {
-            IOUtils.closeQuietly(is);
-        }
+        ByteBuffer frame = null;
+        int i = 0;
+        do {
+            frame = es.nextFrame();
+            if (frame == null)
+                continue;
+            NALUnit nu = NALUnit.read(frame);
+            if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
+
+                track.addFrame(new MP4Packet(formPacket(nu, frame), i, 25, 1, i, nu.type == NALUnitType.IDR_SLICE,
+                        null, i, 0));
+                i++;
+            } else if (nu.type == NALUnitType.SPS) {
+                spsList.add(SeqParameterSet.read(frame));
+            } else if (nu.type == NALUnitType.PPS) {
+                ppsList.add(PictureParameterSet.read(frame));
+            }
+        } while (frame != null);
     }
 
-    private static Buffer formPacket(NALUnit nu, InputStream nextNALUnit) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(baos);
-        byte[] data = IOUtils.toByteArray(nextNALUnit);
-        out.writeInt(data.length + 1);
+    private static ByteBuffer formPacket(NALUnit nu, ByteBuffer nextNALUnit) throws IOException {
+        ByteBuffer out = ByteBuffer.allocate(nextNALUnit.remaining() + 5);
+        out.putInt(nextNALUnit.remaining() + 1);
         nu.write(out);
-        out.write(data);
-        return new Buffer(baos.toByteArray());
+        ByteBufferUtil.write(out, nextNALUnit);
+        out.flip();
+        return out;
     }
 }

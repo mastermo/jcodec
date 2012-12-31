@@ -9,13 +9,11 @@ import static org.jcodec.common.model.Unit.SEC;
 
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.util.EnumSet;
 
 import javax.imageio.ImageIO;
@@ -24,27 +22,19 @@ import org.jcodec.codecs.prores.ProresDecoder;
 import org.jcodec.codecs.prores.ProresEncoder;
 import org.jcodec.codecs.prores.ProresEncoder.Profile;
 import org.jcodec.codecs.y4m.Y4MDecoder;
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.io.Buffer;
-import org.jcodec.common.io.FileRAInputStream;
 import org.jcodec.common.io.FileRAOutputStream;
 import org.jcodec.common.io.RAOutputStream;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Picture;
-import org.jcodec.common.model.Picture8Bit;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
-import org.jcodec.common.model.Unit;
 import org.jcodec.containers.mp4.MP4Demuxer;
-import org.jcodec.containers.mp4.MP4Demuxer.DemuxerTrack;
 import org.jcodec.containers.mp4.MP4Demuxer.FramesTrack;
 import org.jcodec.containers.mp4.MP4DemuxerException;
 import org.jcodec.containers.mp4.MP4Muxer;
 import org.jcodec.containers.mp4.MP4Muxer.CompressedTrack;
 import org.jcodec.containers.mp4.MP4Packet;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
 import org.jcodec.scale.AWTUtil;
 import org.jcodec.scale.RgbToYuv422;
 import org.jcodec.scale.Yuv420pToYuv422p;
@@ -108,12 +98,12 @@ public class TranscodeMain {
                     ColorSpace.YUV422_10);
             Picture frame;
             int i = 0;
+            ByteBuffer buf = ByteBuffer.allocate(frames.getSize().getWidth() * frames.getSize().getHeight() * 6);
             while ((frame = frames.nextFrame()) != null) {
                 color.transform(frame, picture);
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                encoder.encodeFrame(baos, picture);
-                videoTrack.addFrame(new MP4Packet(new Buffer(baos.toByteArray()), i * fps.getDen(), fps.getNum(), fps
-                        .getDen(), i, true, null, i * fps.getDen(), 0));
+                ByteBuffer ff = encoder.encodeFrame(buf, picture);
+                videoTrack.addFrame(new MP4Packet(ff, i * fps.getDen(), fps.getNum(), fps.getDen(), i, true, null, i
+                        * fps.getDen(), 0));
                 i++;
             }
         } finally {
@@ -174,6 +164,7 @@ public class TranscodeMain {
             RgbToYuv422 transform = new RgbToYuv422(2, 0);
             Picture yuv = null;
 
+            ByteBuffer buf = null;
             CompressedTrack videoTrack = null;
             int i;
             for (i = 1;; i++) {
@@ -189,12 +180,12 @@ public class TranscodeMain {
                 }
                 if (yuv == null)
                     yuv = Picture.create(rgb.getWidth(), rgb.getHeight(), YUV420);
+                if (buf == null)
+                    buf = ByteBuffer.allocate(rgb.getWidth() * rgb.getHeight() * 6);
                 transform.transform(AWTUtil.fromBufferedImage(rgb), yuv);
 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                encoder.encodeFrame(baos, yuv);
-                videoTrack.addFrame(new MP4Packet(new Buffer(baos.toByteArray()), i * 1001, 24000, 1001, i, true, null,
-                        i * 1001, 0));
+                ByteBuffer ff = encoder.encodeFrame(buf, yuv);
+                videoTrack.addFrame(new MP4Packet(ff, i * 1001, 24000, 1001, i, true, null, i * 1001, 0));
             }
             if (i == 1) {
                 System.out.println("Image sequence not found");

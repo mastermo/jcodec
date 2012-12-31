@@ -15,11 +15,9 @@ import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.codecs.h264.io.write.SliceHeaderWriter;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.JCodecUtil;
+import org.jcodec.common.io.FileRAOutputStream;
 import org.jcodec.common.io.InBits;
 import org.jcodec.common.io.OutBits;
-import org.jcodec.common.io.FileRAInputStream;
-import org.jcodec.common.io.FileRAOutputStream;
 import org.jcodec.containers.mp4.MP4Demuxer;
 import org.jcodec.containers.mp4.MP4Demuxer.DemuxerTrack;
 import org.jcodec.containers.mp4.MP4DemuxerException;
@@ -58,16 +56,17 @@ public class MovChangePPS {
 
         AvcCBox avcC = doSampleEntry(videoTrack, outTrack);
 
-        SliceHeaderReader shr = new SliceHeaderReader(avcC);
+        SliceHeaderReader shr = new SliceHeaderReader();
         SliceHeaderWriter shw = new SliceHeaderWriter(avcC.getSPS(0), avcC.getPPS(0));
 
         for (int i = 0; i < videoTrack.getFrameCount(); i++) {
             MP4Packet packet = videoTrack.getFrames(1);
-            outTrack.addFrame(new MP4Packet(packet, doFrame(packet.getData(), shr, shw)));
+            outTrack.addFrame(new MP4Packet(packet, doFrame(packet.getData(), shr, shw, avcC.getSpsList(), avcC.getPpsList())));
         }
 
         muxer.writeHeader();
     }
+
 
     private static AvcCBox doSampleEntry(DemuxerTrack videoTrack, CompressedTrack outTrack) throws IOException {
         SampleEntry se = videoTrack.getSampleEntries()[0];

@@ -2,7 +2,7 @@ package org.jcodec.codecs.mpeg12.bitstream;
 
 import java.io.IOException;
 
-import org.jcodec.common.io.BitstreamReaderBB;
+import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.InBits;
 import org.jcodec.common.io.OutBits;
 
@@ -33,7 +33,7 @@ public class SequenceScalableExtension {
     public int picture_mux_order;
     public int picture_mux_factor;
 
-    public static SequenceScalableExtension read(BitstreamReaderBB in) {
+    public static SequenceScalableExtension read(BitReader in) {
         SequenceScalableExtension sse = new SequenceScalableExtension();
         sse.scalable_mode = in.readNBit(2);
         sse.layer_id = in.readNBit(4);

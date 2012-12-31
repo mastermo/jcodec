@@ -7,7 +7,7 @@ import java.io.IOException;
 import org.jcodec.codecs.h264.io.BTree;
 import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CoeffToken;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -172,9 +172,9 @@ public class CoeffTokenReader {
      * @param leftToken
      * @param topToken
      * @return
-     * @throws IOException
+     * @
      */
-    public CoeffToken read(InBits reader, CoeffToken leftToken, CoeffToken topToken) throws IOException {
+    public CoeffToken read(BitReader reader, CoeffToken leftToken, CoeffToken topToken)  {
 
         int nC = estimateNumberOfCoeffs(leftToken, topToken);
 
@@ -186,9 +186,9 @@ public class CoeffTokenReader {
      * 
      * @param reader
      * @return
-     * @throws IOException
+     * @
      */
-    public CoeffToken readForChromaDC(InBits reader) throws IOException {
+    public CoeffToken readForChromaDC(BitReader reader)  {
 
         int nC = estimateNumberOfCoeffsForChromaDC();
 
@@ -219,7 +219,7 @@ public class CoeffTokenReader {
         }
     }
 
-    protected static CoeffToken read(InBits in, int nC) throws IOException {
+    protected static CoeffToken read(BitReader in, int nC)  {
 
         BTree bt = null;
         if (nC == -2) {

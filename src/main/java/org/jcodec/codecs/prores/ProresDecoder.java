@@ -11,15 +11,13 @@ import static org.jcodec.codecs.prores.ProresConsts.runCodebooks;
 import static org.jcodec.common.dct.SimpleIDCT10Bit.idct10;
 import static org.jcodec.common.tools.MathUtil.log2;
 
-import java.io.DataInput;
-import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.prores.ProresConsts.FrameHeader;
 import org.jcodec.codecs.prores.ProresConsts.PictureHeader;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.VideoDecoder;
-import org.jcodec.common.io.BitstreamReaderBB;
-import org.jcodec.common.io.Buffer;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 
@@ -54,7 +52,7 @@ public class ProresDecoder implements VideoDecoder {
         return high + (mask[high & 0x7] & low);
     }
 
-    public static final int readCodeword(InBits reader, Codebook codebook) throws IOException {
+    public static final int readCodeword(BitReader reader, Codebook codebook) {
         int q = nZeros(reader.checkNBit(14));
 
         int val;
@@ -81,7 +79,7 @@ public class ProresDecoder implements VideoDecoder {
         return (val >> 1) ^ golumbSign(val);
     }
 
-    private static final int golumbSign(int val) {
+    public static final int golumbSign(int val) {
         return -(val & 1);
     }
 
@@ -89,7 +87,7 @@ public class ProresDecoder implements VideoDecoder {
         return (val ^ sign) - sign;
     }
 
-    static final void readDCCoeffs(InBits bits, int[] qMat, int[] out, int blocksPerSlice) throws IOException {
+    public static final void readDCCoeffs(BitReader bits, int[] qMat, int[] out, int blocksPerSlice) {
         int c = readCodeword(bits, firstDCCodebook);
         if (c < 0) {
             return;
@@ -116,8 +114,7 @@ public class ProresDecoder implements VideoDecoder {
         }
     }
 
-    static final void readACCoeffs(InBits bits, int[] qMat, int[] out, int blocksPerSlice, int[] scan, int max)
-            throws IOException {
+    protected static final void readACCoeffs(BitReader bits, int[] qMat, int[] out, int blocksPerSlice, int[] scan, int max) {
         int run = 4;
         int level = 2;
 
@@ -149,8 +146,7 @@ public class ProresDecoder implements VideoDecoder {
         return ((val * qMat[ind]) >> 2);
     }
 
-    int[] decodeOnePlane(InBits bits, int blocksPerSlice, int[] qMat, int[] scan, int mbX, int mbY, int plane)
-            throws IOException {
+    protected int[] decodeOnePlane(BitReader bits, int blocksPerSlice, int[] qMat, int[] scan, int mbX, int mbY, int plane) {
         int[] out = new int[blocksPerSlice << 6];
         // try {
         readDCCoeffs(bits, qMat, out, blocksPerSlice);
@@ -170,97 +166,85 @@ public class ProresDecoder implements VideoDecoder {
         return out;
     }
 
-    public Picture decodeFrame(Buffer data, int[][] target) {
-        try {
-            DataInput inp = data.dinp();
+    public Picture decodeFrame(ByteBuffer data, int[][] target) {
+        FrameHeader fh = readFrameHeader(data);
 
-            FrameHeader fh = readFrameHeader(inp);
+        int codedWidth = (fh.width + 15) & ~0xf;
+        int codedHeight = (fh.height + 15) & ~0xf;
 
-            int codedWidth = (fh.width + 15) & ~0xf;
-            int codedHeight = (fh.height + 15) & ~0xf;
+        int lumaSize = codedWidth * codedHeight;
+        int chromaSize = lumaSize >> 1;
 
-            int lumaSize = codedWidth * codedHeight;
-            int chromaSize = lumaSize >> 1;
+        if (target == null || target[0].length < lumaSize || target[1].length < chromaSize
+                || target[2].length < chromaSize) {
+            throw new RuntimeException("Provided output picture won't fit into provided buffer");
+        }
 
-            if (target == null || target[0].length < lumaSize || target[1].length < chromaSize
-                    || target[2].length < chromaSize) {
+        if (fh.frameType == 0) {
+            decodePicture(data, target, fh.width, fh.height, fh.qMatLuma, fh.qMatChroma, fh.scan, 0);
+        } else {
+            decodePicture(data, target, fh.width, fh.height >> 1, fh.qMatLuma, fh.qMatChroma, fh.scan,
+                    fh.topFieldFirst ? 1 : 2);
+
+            decodePicture(data, target, fh.width, fh.height >> 1, fh.qMatLuma, fh.qMatChroma, fh.scan,
+                    fh.topFieldFirst ? 2 : 1);
+        }
+
+        return new Picture(codedWidth, codedHeight, target, ColorSpace.YUV422_10);
+    }
+
+    public Picture[] decodeFields(ByteBuffer data, int[][][] target) {
+        FrameHeader fh = readFrameHeader(data);
+
+        int codedWidth = (fh.width + 15) & ~0xf;
+        int codedHeight = (fh.height + 15) & ~0xf;
+
+        int lumaSize = codedWidth * codedHeight;
+        int chromaSize = lumaSize >> 1;
+
+        if (fh.frameType == 0) {
+            if (target == null || target[0][0].length < lumaSize || target[0][1].length < chromaSize
+                    || target[0][2].length < chromaSize) {
                 throw new RuntimeException("Provided output picture won't fit into provided buffer");
             }
 
-            if (fh.frameType == 0) {
-                decodePicture(data, target, fh.width, fh.height, fh.qMatLuma, fh.qMatChroma, fh.scan, 0);
-            } else {
-                decodePicture(data, target, fh.width, fh.height >> 1, fh.qMatLuma, fh.qMatChroma, fh.scan,
-                        fh.topFieldFirst ? 1 : 2);
-
-                decodePicture(data, target, fh.width, fh.height >> 1, fh.qMatLuma, fh.qMatChroma, fh.scan,
-                        fh.topFieldFirst ? 2 : 1);
+            decodePicture(data, target[0], fh.width, fh.height, fh.qMatLuma, fh.qMatChroma, fh.scan, 0);
+            return new Picture[] { new Picture(codedWidth, codedHeight, target[0], ColorSpace.YUV422_10) };
+        } else {
+            lumaSize >>= 1;
+            chromaSize >>= 1;
+            if (target == null || target[0][0].length < lumaSize || target[0][1].length < chromaSize
+                    || target[0][2].length < chromaSize || target[1][0].length < lumaSize
+                    || target[1][1].length < chromaSize || target[1][2].length < chromaSize) {
+                throw new RuntimeException("Provided output picture won't fit into provided buffer");
             }
 
-            return new Picture(codedWidth, codedHeight, target, ColorSpace.YUV422_10);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            decodePicture(data, target[fh.topFieldFirst ? 0 : 1], fh.width, fh.height >> 1, fh.qMatLuma, fh.qMatChroma,
+                    fh.scan, 0);
+
+            decodePicture(data, target[fh.topFieldFirst ? 1 : 0], fh.width, fh.height >> 1, fh.qMatLuma, fh.qMatChroma,
+                    fh.scan, 0);
+
+            return new Picture[] { new Picture(codedWidth, codedHeight >> 1, target[0], ColorSpace.YUV422_10),
+                    new Picture(codedWidth, codedHeight >> 1, target[1], ColorSpace.YUV422_10) };
         }
     }
 
-    public Picture[] decodeFields(Buffer data, int[][][] target) {
-        try {
-            DataInput inp = data.dinp();
-
-            FrameHeader fh = readFrameHeader(inp);
-
-            int codedWidth = (fh.width + 15) & ~0xf;
-            int codedHeight = (fh.height + 15) & ~0xf;
-
-            int lumaSize = codedWidth * codedHeight;
-            int chromaSize = lumaSize >> 1;
-
-            if (fh.frameType == 0) {
-                if (target == null || target[0][0].length < lumaSize || target[0][1].length < chromaSize
-                        || target[0][2].length < chromaSize) {
-                    throw new RuntimeException("Provided output picture won't fit into provided buffer");
-                }
-
-                decodePicture(data, target[0], fh.width, fh.height, fh.qMatLuma, fh.qMatChroma, fh.scan, 0);
-                return new Picture[] { new Picture(codedWidth, codedHeight, target[0], ColorSpace.YUV422_10) };
-            } else {
-                lumaSize >>= 1;
-                chromaSize >>= 1;
-                if (target == null || target[0][0].length < lumaSize || target[0][1].length < chromaSize
-                        || target[0][2].length < chromaSize || target[1][0].length < lumaSize
-                        || target[1][1].length < chromaSize || target[1][2].length < chromaSize) {
-                    throw new RuntimeException("Provided output picture won't fit into provided buffer");
-                }
-
-                decodePicture(data, target[fh.topFieldFirst ? 0 : 1], fh.width, fh.height >> 1, fh.qMatLuma,
-                        fh.qMatChroma, fh.scan, 0);
-
-                decodePicture(data, target[fh.topFieldFirst ? 1 : 0], fh.width, fh.height >> 1, fh.qMatLuma,
-                        fh.qMatChroma, fh.scan, 0);
-
-                return new Picture[] { new Picture(codedWidth, codedHeight >> 1, target[0], ColorSpace.YUV422_10),
-                        new Picture(codedWidth, codedHeight >> 1, target[1], ColorSpace.YUV422_10) };
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    static FrameHeader readFrameHeader(DataInput inp) throws IOException {
-        int frameSize = inp.readInt();
+    public static FrameHeader readFrameHeader(ByteBuffer inp) {
+        int frameSize = inp.getInt();
         String sig = readSig(inp);
         if (!"icpf".equals(sig))
             throw new RuntimeException("Not a prores frame");
 
-        short hdrSize = inp.readShort();
-        short version = inp.readShort();
+        short hdrSize = inp.getShort();
+        short version = inp.getShort();
 
-        int res1 = inp.readInt();
+        int res1 = inp.getInt();
 
-        short width = inp.readShort();
-        short height = inp.readShort();
+        short width = inp.getShort();
+        short height = inp.getShort();
 
-        int flags1 = inp.readByte();
+        int flags1 = inp.get();
 
         int frameType = (flags1 >> 2) & 3;
 
@@ -275,14 +259,14 @@ public class ProresDecoder implements VideoDecoder {
                 topFieldFirst = true;
         }
 
-        byte res2 = inp.readByte();
-        byte prim = inp.readByte();
-        byte transFunc = inp.readByte();
-        byte matrix = inp.readByte();
-        byte pixFmt = inp.readByte();
-        byte res3 = inp.readByte();
+        byte res2 = inp.get();
+        byte prim = inp.get();
+        byte transFunc = inp.get();
+        byte matrix = inp.get();
+        byte pixFmt = inp.get();
+        byte res3 = inp.get();
 
-        int flags2 = inp.readByte() & 0xff;
+        int flags2 = inp.get() & 0xff;
 
         int[] qMatLuma = new int[64];
         int[] qMatChroma = new int[64];
@@ -299,25 +283,25 @@ public class ProresDecoder implements VideoDecoder {
             fill(qMatChroma, 4);
         }
 
-        inp.skipBytes(hdrSize - (20 + (hasQMatLuma(flags2) ? 64 : 0) + (hasQMatChroma(flags2) ? 64 : 0)));
+        inp.position(inp.position() + hdrSize
+                - (20 + (hasQMatLuma(flags2) ? 64 : 0) + (hasQMatChroma(flags2) ? 64 : 0)));
 
-        return new FrameHeader(frameSize - hdrSize - 8, width, height, frameType, topFieldFirst, scan, qMatLuma, qMatChroma);
+        return new FrameHeader(frameSize - hdrSize - 8, width, height, frameType, topFieldFirst, scan, qMatLuma,
+                qMatChroma);
     }
 
-    static final String readSig(DataInput inp) throws IOException {
+    static final String readSig(ByteBuffer inp) {
         byte[] sig = new byte[4];
-        inp.readFully(sig);
+        inp.get(sig);
         return new String(sig);
     }
 
-    private void decodePicture(Buffer data, int[][] result, int width, int height, int[] qMatLuma, int[] qMatChroma,
-            int[] scan, int pictureType) throws IOException {
-        DataInput inp = data.dinp();
+    private void decodePicture(ByteBuffer data, int[][] result, int width, int height, int[] qMatLuma,
+            int[] qMatChroma, int[] scan, int pictureType) {
+        ProresConsts.PictureHeader ph = readPictureHeader(data);
 
-        ProresConsts.PictureHeader ph = readPictureHeader(inp);
-        
         int mbWidth = (width + 15) >> 4;
-//        int mbHeight = (height + 15) >> 4;
+        // int mbHeight = (height + 15) >> 4;
 
         int mbX = 0, mbY = 0;
         int sliceMbCount = 1 << ph.log2SliceMbWidth;
@@ -338,30 +322,29 @@ public class ProresDecoder implements VideoDecoder {
         }
     }
 
-    public static PictureHeader readPictureHeader(DataInput inp) throws IOException {
-        int hdrSize = (inp.readByte() & 0xff) >> 3;
-        inp.skipBytes(4);
-        int sliceCount = inp.readShort();
+    public static PictureHeader readPictureHeader(ByteBuffer inp) {
+        int hdrSize = (inp.get() & 0xff) >> 3;
+        inp.getInt();
+        int sliceCount = inp.getShort();
 
-        int a = inp.readByte() & 0xff;
+        int a = inp.get() & 0xff;
         int log2SliceMbWidth = a >> 4;
-        
+
         short[] sliceSizes = new short[sliceCount];
         for (int i = 0; i < sliceCount; i++) {
-            sliceSizes[i] = inp.readShort();
+            sliceSizes[i] = inp.getShort();
         }
         return new PictureHeader(log2SliceMbWidth, sliceSizes);
     }
 
-    private void decodeSlice(Buffer data, int[] qMatLuma, int[] qMatChroma, int[] scan, int sliceMbCount, int mbX,
-            int mbY, short sliceSize, int[][] result, int lumaStride, int pictureType) throws IOException {
-        DataInput inp = data.dinp();
+    private void decodeSlice(ByteBuffer data, int[] qMatLuma, int[] qMatChroma, int[] scan, int sliceMbCount, int mbX,
+            int mbY, short sliceSize, int[][] result, int lumaStride, int pictureType) {
 
-        int hdrSize = (inp.readByte() & 0xff) >> 3;
-        int qScale = clip(inp.readByte() & 0xff, 1, 224);
+        int hdrSize = (data.get() & 0xff) >> 3;
+        int qScale = clip(data.get() & 0xff, 1, 224);
         qScale = qScale > 128 ? qScale - 96 << 2 : qScale;
-        int yDataSize = inp.readShort();
-        int uDataSize = inp.readShort();
+        int yDataSize = data.getShort();
+        int uDataSize = data.getShort();
         int vDataSize = sliceSize - uDataSize - yDataSize - hdrSize;
 
         int[] y = decodeOnePlane(bitstream(data, yDataSize), sliceMbCount << 2, scaleMat(qMatLuma, qScale), scan, mbX,
@@ -374,7 +357,7 @@ public class ProresDecoder implements VideoDecoder {
         putSlice(result, lumaStride, mbX, mbY, y, u, v, pictureType == 0 ? 0 : 1, pictureType == 2 ? 1 : 0);
     }
 
-    static final int[] scaleMat(int[] qMatLuma, int qScale) {
+    public static final int[] scaleMat(int[] qMatLuma, int qScale) {
         int[] res = new int[qMatLuma.length];
         for (int i = 0; i < qMatLuma.length; i++)
             res[i] = qMatLuma[i] * qScale;
@@ -382,8 +365,8 @@ public class ProresDecoder implements VideoDecoder {
         return res;
     }
 
-    static final InBits bitstream(Buffer data, int dataSize) throws IOException {
-        return new BitstreamReaderBB(data.read(dataSize));
+    static final BitReader bitstream(ByteBuffer data, int dataSize) {
+        return new BitReader(ByteBufferUtil.sub(data, dataSize));
     }
 
     static final int clip(int val, int min, int max) {
@@ -435,9 +418,9 @@ public class ProresDecoder implements VideoDecoder {
         return (flags2 & 1) != 0;
     }
 
-    static final void readQMat(DataInput inp, int[] qMatLuma, int[] scan) throws IOException {
+    static final void readQMat(ByteBuffer inp, int[] qMatLuma, int[] scan) {
         byte[] b = new byte[64];
-        inp.readFully(b);
+        inp.get(b);
         for (int i = 0; i < 64; i++) {
             qMatLuma[i] = b[scan[i]] & 0xff;
         }
@@ -447,11 +430,11 @@ public class ProresDecoder implements VideoDecoder {
         return (flags2 & 2) != 0;
     }
 
-    public boolean isProgressive(Buffer data) {
+    public boolean isProgressive(ByteBuffer data) {
         return (((data.get(20) & 0xff) >> 2) & 3) == 0;
     }
 
-    public int probe(Buffer data) {
+    public int probe(ByteBuffer data) {
         if (data.get(4) == 'i' && data.get(5) == 'c' && data.get(6) == 'p' && data.get(7) == 'f')
             return 100;
         return 0;

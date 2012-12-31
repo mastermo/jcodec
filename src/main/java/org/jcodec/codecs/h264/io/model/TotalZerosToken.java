@@ -2,10 +2,8 @@ package org.jcodec.codecs.h264.io.model;
 
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readCE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.BTree;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -100,18 +98,18 @@ public class TotalZerosToken {
         }
     }
 
-    public static int read4x4(InBits in, int totalCoeff) throws IOException {
+    public static int read4x4(BitReader in, int totalCoeff)  {
         Object value = readCE(in, btrees[totalCoeff - 1], "Zeros left");
         int intValue = ((Integer) value).intValue();
         return intValue;
     }
 
-    public static int readCr2x2(InBits in, int totalCoeff) throws IOException {
+    public static int readCr2x2(BitReader in, int totalCoeff)  {
         Object value = readCE(in, btrees2x2[totalCoeff - 1], "Zeros left");
         return ((Integer) value).intValue();
     }
 
-    public static int readCr4x2(InBits in, int totalCoeff) throws IOException {
+    public static int readCr4x2(BitReader in, int totalCoeff)  {
         Object value = readCE(in, btrees4x2[totalCoeff - 1], "Zeros left");
         return ((Integer) value).intValue();
     }

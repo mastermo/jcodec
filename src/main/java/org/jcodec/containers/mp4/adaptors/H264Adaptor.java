@@ -9,6 +9,7 @@ import org.jcodec.codecs.h264.H264Demuxer;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
+import org.jcodec.common.ByteBufferUtil;
 import org.jcodec.common.model.Packet;
 import org.jcodec.containers.mp4.MP4Demuxer;
 import org.jcodec.containers.mp4.boxes.NodeBox;
@@ -41,7 +42,7 @@ public class H264Adaptor implements H264Demuxer {
         if (pkt == null)
             return null;
 
-        return new AUFromContainerSample(pkt.getData().toArray());
+        return new AUFromContainerSample(ByteBufferUtil.toArray(pkt.getData()));
     }
 
     public PictureParameterSet getPPS(int id) {

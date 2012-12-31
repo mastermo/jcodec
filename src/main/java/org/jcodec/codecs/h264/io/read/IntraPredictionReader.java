@@ -4,10 +4,8 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readNBit;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 
-import java.io.IOException;
-
 import org.jcodec.codecs.h264.io.model.IntraNxNPrediction;
-import org.jcodec.common.io.InBits;
+import org.jcodec.common.io.BitReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -31,10 +29,10 @@ public class IntraPredictionReader {
      * @param predLeft
      * @param predTop
      * @return
-     * @throws IOException
+     * @
      */
-    public static IntraNxNPrediction readPrediction4x4(InBits reader, IntraNxNPrediction predLeft,
-            IntraNxNPrediction predTop, boolean leftAvailable, boolean topAvailable) throws IOException {
+    public static IntraNxNPrediction readPrediction4x4(BitReader reader, IntraNxNPrediction predLeft,
+            IntraNxNPrediction predTop, boolean leftAvailable, boolean topAvailable)  {
 
         int[] predModes = new int[24];
         if (predTop == null) {
@@ -99,7 +97,7 @@ public class IntraPredictionReader {
         return top < left ? top : left;
     }
 
-    public static IntraNxNPrediction readPrediction8x8(InBits reader) throws IOException {
+    public static IntraNxNPrediction readPrediction8x8(BitReader reader)  {
         throw new UnsupportedOperationException("8x8 not supported");
         // boolean[] prev_intra8x8_pred_mode_flag = new boolean[4];
         // int[] rem_intra8x8_pred_mode = new int[4];

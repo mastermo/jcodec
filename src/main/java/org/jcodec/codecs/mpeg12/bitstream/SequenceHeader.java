@@ -5,10 +5,10 @@ import static org.jcodec.common.io.WriterBE.intBytes;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
-import org.jcodec.common.io.BitstreamReaderBB;
+import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.BitstreamWriter;
-import org.jcodec.common.io.Buffer;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -39,8 +39,8 @@ public class SequenceHeader {
     public SequenceScalableExtension sequenceScalableExtension;
     public SequenceDisplayExtension sequenceDisplayExtension;
 
-    public static SequenceHeader read(Buffer bb) {
-        BitstreamReaderBB in = new BitstreamReaderBB(bb);
+    public static SequenceHeader read(ByteBuffer bb) {
+        BitReader in = new BitReader(bb);
         SequenceHeader sh = new SequenceHeader();
         sh.horizontal_size = in.readNBit(12);
         sh.vertical_size = in.readNBit(12);
@@ -66,10 +66,10 @@ public class SequenceHeader {
         return sh;
     }
 
-    public static void readExtension(Buffer bb, SequenceHeader sh) {
+    public static void readExtension(ByteBuffer bb, SequenceHeader sh) {
         hasExtensions = true;
 
-        BitstreamReaderBB in = new BitstreamReaderBB(bb);
+        BitReader in = new BitReader(bb);
         int extType = in.readNBit(4);
         switch (extType) {
         case Sequence_Extension:
