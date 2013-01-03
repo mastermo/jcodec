@@ -1,16 +1,14 @@
 package org.jcodec.movtool;
 
-import static org.jcodec.common.JCodecUtil.bufin;
-
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.List;
 
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.io.FileRAInputStream;
-import org.jcodec.common.io.RAInputStream;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.containers.mp4.Chunk;
 import org.jcodec.containers.mp4.ChunkReader;
 import org.jcodec.containers.mp4.ChunkWriter;
@@ -44,9 +42,9 @@ public class Flattern {
         }
         File outFile = new File(args[1]);
         outFile.delete();
-        RAInputStream input = null;
+        FileChannel input = null;
         try {
-            input = bufin(new File(args[0]));
+            input = new FileInputStream(new File(args[0])).getChannel();
             MovieBox movie = MP4Util.parseMovie(input);
             new Flattern().flattern(movie, outFile);
         } finally {
@@ -55,22 +53,25 @@ public class Flattern {
         }
     }
 
-    public void flattern(MovieBox movie, RandomAccessFile out) throws IOException {
+    public void flattern(MovieBox movie, FileChannel out) throws IOException {
         if (!movie.isPureRefMovie(movie))
             throw new IllegalArgumentException("movie should be reference");
+        ByteBuffer buf = ByteBuffer.allocate(16 * 1024 * 1024);
         FileTypeBox ftyp = new FileTypeBox("qt  ", 0x20050300, Arrays.asList(new String[] { "qt  " }));
-        ftyp.write(out);
-        long movieOff = out.getFilePointer();
-        movie.write(out);
+        ftyp.write(buf);
+        long movieOff = buf.position();
+        movie.write(buf);
 
         int extraSpace = calcSpaceReq(movie);
-        new Header("free", 8 + extraSpace).write(out);
-        out.write(new byte[extraSpace]);
+        new Header("free", 8 + extraSpace).write(buf);
+        NIOUtils.skip(buf, extraSpace);
 
-        long mdatOff = out.getFilePointer();
-        new Header("mdat", 0x100000001L).write(out);
+        long mdatOff = buf.position();
+        new Header("mdat", 0x100000001L).write(buf);
+        buf.flip();
+        out.write(buf);
 
-        RAInputStream[][] inputs = getInputs(movie);
+        FileChannel[][] inputs = getInputs(movie);
 
         TrakBox[] tracks = movie.getTracks();
         ChunkReader[] readers = new ChunkReader[tracks.length];
@@ -105,34 +106,34 @@ public class Flattern {
             writers[min].write(head[min]);
             head[min] = readers[min].next();
         }
-        long mdatSize = out.getFilePointer() - mdatOff;
+        long mdatSize = out.position() - mdatOff;
 
         for (int i = 0; i < tracks.length; i++) {
             writers[i].apply();
         }
-        out.seek(movieOff);
-        movie.write(out);
+        out.position(movieOff);
+        MP4Util.writeMovie(out, movie);
 
-        long extra = mdatOff - out.getFilePointer();
+        long extra = mdatOff - out.position();
         if (extra < 0)
             throw new RuntimeException("Not enough space to write the header");
-        new Header("free", extra).write(out);
+        out.write((ByteBuffer) ByteBuffer.allocate(8).putInt((int) extra).put(new byte[] { 'f', 'r', 'e', 'e' }).flip());
 
-        out.seek(mdatOff + 8);
-        out.writeLong(mdatSize);
+        out.position(mdatOff + 8);
+        out.write(ByteBuffer.allocate(8).putLong(mdatSize));
     }
 
-    protected RAInputStream[][] getInputs(MovieBox movie) throws IOException {
+    protected FileChannel[][] getInputs(MovieBox movie) throws IOException {
         TrakBox[] tracks = movie.getTracks();
-        RAInputStream[][] result = new RAInputStream[tracks.length][];
+        FileChannel[][] result = new FileChannel[tracks.length][];
         for (int i = 0; i < tracks.length; i++) {
             DataRefBox drefs = NodeBox.findFirst(tracks[i], DataRefBox.class, "mdia", "minf", "dinf", "dref");
             if (drefs == null) {
                 throw new RuntimeException("No data references");
             }
             List<Box> entries = drefs.getBoxes();
-            RAInputStream[] e = new RAInputStream[entries.size()];
-            RAInputStream[] inputs = new RAInputStream[entries.size()];
+            FileChannel[] e = new FileChannel[entries.size()];
+            FileChannel[] inputs = new FileChannel[entries.size()];
             for (int j = 0; j < e.length; j++) {
                 inputs[j] = Flattern.resolveDataRef(entries.get(j));
             }
@@ -151,17 +152,17 @@ public class Flattern {
         return sum;
     }
 
-    public static RAInputStream resolveDataRef(Box box) throws IOException {
+    public static FileChannel resolveDataRef(Box box) throws IOException {
         if (box instanceof UrlBox) {
             String url = ((UrlBox) box).getUrl();
             if (!url.startsWith("file://"))
                 throw new RuntimeException("Only file:// urls are supported in data reference");
-            return bufin(new File(url.substring(7)));
+            return new FileInputStream(new File(url.substring(7))).getChannel();
         } else if (box instanceof AliasBox) {
             String uxPath = ((AliasBox) box).getUnixPath();
             if (uxPath == null)
                 throw new RuntimeException("Could not resolve alias");
-            return bufin(new File(uxPath));
+            return new FileInputStream(new File(uxPath)).getChannel();
         } else {
             throw new RuntimeException(box.getHeader().getFourcc() + " dataref type is not supported");
         }
@@ -169,9 +170,9 @@ public class Flattern {
 
     public void flattern(MovieBox movie, File video) throws IOException {
         video.delete();
-        RandomAccessFile out = null;
+        FileChannel out = null;
         try {
-            out = new RandomAccessFile(video, "rw");
+            out = new FileInputStream(video).getChannel();
             flattern(movie, out);
         } finally {
             if (out != null)

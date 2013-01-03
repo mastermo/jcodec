@@ -17,7 +17,7 @@ import junit.framework.Assert;
 
 import org.jcodec.codecs.mpeg12.MPEGDecoder;
 import org.jcodec.codecs.s302.S302MDecoder;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.AudioBuffer;
 import org.jcodec.common.model.ChannelLabel;
 import org.jcodec.common.model.Packet;
@@ -100,7 +100,7 @@ public class MTSAdapter implements Adapter {
             while (remaining > 0) {
 
                 if (ts.pid == guid && ts.payload != null) {
-                    ByteBuffer part = ByteBufferUtil.sub(ts.payload, Math.min(remaining, ts.payload.remaining()));
+                    ByteBuffer part = NIOUtils.read(ts.payload, Math.min(remaining, ts.payload.remaining()));
                     packets.add(part);
                     remaining -= part.remaining();
                 }
@@ -114,7 +114,7 @@ public class MTSAdapter implements Adapter {
                     break;
             }
 
-            ByteBuffer data = ByteBufferUtil.combine(packets);
+            ByteBuffer data = NIOUtils.combine(packets);
 
             return new Packet(data, e.pts, 90000, e.duration, e.frameNo, true, null);
         }
@@ -278,7 +278,7 @@ public class MTSAdapter implements Adapter {
                         leading.limit(data.position() - 3);
                         packets.add(leading);
                         packets.add(0, index.getExtraData(sid, e.edInd));
-                        Packet pkt = new Packet(ByteBufferUtil.combine(packets), e.pts, 90000, e.duration, e.frameNo,
+                        Packet pkt = new Packet(NIOUtils.combine(packets), e.pts, 90000, e.duration, e.frameNo,
                                 e.frameType == IntraCoded, e.getTapeTimecode());
                         pkt.setDisplayOrder(e.displayOrder);
                         return pkt;

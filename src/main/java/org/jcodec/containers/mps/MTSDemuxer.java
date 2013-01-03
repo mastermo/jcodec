@@ -8,7 +8,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.containers.mps.MPSDemuxer.Track;
 import org.junit.Assert;
 
@@ -37,7 +37,7 @@ public class MTSDemuxer {
             public int read(ByteBuffer dst) throws IOException {
                 MTSPacket packet = getPacket(channel);
                 int rem = packet.payload.remaining();
-                ByteBufferUtil.write(dst, packet.payload);
+                NIOUtils.write(dst, packet.payload);
                 return rem - packet.payload.remaining();
             }
         });
@@ -100,7 +100,7 @@ public class MTSDemuxer {
 
     public static MTSPacket readPacket(ReadableByteChannel channel) throws IOException {
         ByteBuffer buffer = ByteBuffer.allocate(188);
-        if (ByteBufferUtil.read(channel, buffer) != 188)
+        if (NIOUtils.read(channel, buffer) != 188)
             return null;
         buffer.flip();
         return parsePacket(buffer);
@@ -118,7 +118,7 @@ public class MTSDemuxer {
         if ((b0 & 0x20) != 0) {
             int taken = 0;
             taken = (buffer.get() & 0xff) + 1;
-            ByteBufferUtil.skip(buffer, taken - 1);
+            NIOUtils.skip(buffer, taken - 1);
         }
         return new MTSPacket(guid, payloadStart == 1, ((b0 & 0x10) != 0) ? buffer : null);
     }
@@ -127,7 +127,7 @@ public class MTSDemuxer {
         TIntObjectHashMap<List<ByteBuffer>> streams = new TIntObjectHashMap<List<ByteBuffer>>();
         while (true) {
             try {
-                ByteBuffer sub = ByteBufferUtil.sub(b, 188);
+                ByteBuffer sub = NIOUtils.read(b, 188);
                 if (sub.remaining() < 188)
                     break;
 
@@ -145,7 +145,7 @@ public class MTSDemuxer {
         int maxScore = 0;
         int[] keys = streams.keys();
         for (int i : keys) {
-            int score = MPSDemuxer.probe(ByteBufferUtil.combine(streams.get(i)));
+            int score = MPSDemuxer.probe(NIOUtils.combine(streams.get(i)));
             if (score > maxScore)
                 maxScore = score;
         }

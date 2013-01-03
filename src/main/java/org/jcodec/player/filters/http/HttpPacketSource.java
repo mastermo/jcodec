@@ -8,7 +8,7 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.RationalLarge;
 import org.jcodec.common.tools.Debug;
@@ -90,7 +90,7 @@ public class HttpPacketSource implements PacketSource {
 
     private Packet copyPkt(ByteBuffer buffer, Packet pkt) {
         ByteBuffer out = buffer.duplicate();
-        ByteBufferUtil.write(out, pkt.getData());
+        NIOUtils.write(out, pkt.getData());
         out.flip();
         return new Packet(pkt, out);
     }

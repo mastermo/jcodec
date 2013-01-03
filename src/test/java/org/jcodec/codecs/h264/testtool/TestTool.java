@@ -1,6 +1,6 @@
 package org.jcodec.codecs.h264.testtool;
 
-import static org.jcodec.common.ByteBufferUtil.map;
+import static org.jcodec.common.NIOUtils.map;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -13,7 +13,7 @@ import org.apache.commons.io.IOUtils;
 import org.jcodec.codecs.h264.H264Decoder;
 import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.codecs.util.PGMIO;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 
@@ -72,7 +72,7 @@ public class TestTool {
 
                 if (a.framesFolder != null) {
                     File frameFile = new File(a.framesFolder, "frame" + i + ".264");
-                    ByteBufferUtil.writeTo(nextFrame, frameFile);
+                    NIOUtils.writeTo(nextFrame, frameFile);
                 }
 
                 if (!compareFrames(ref, frame)) {

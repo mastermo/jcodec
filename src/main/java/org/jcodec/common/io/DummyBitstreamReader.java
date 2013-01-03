@@ -1,6 +1,5 @@
 package org.jcodec.common.io;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -15,7 +14,7 @@ import org.jcodec.codecs.h264.io.CharCache;
  * @author The JCodec project
  * 
  */
-public class DummyBitstreamReader implements InBits {
+public class DummyBitstreamReader {
     private InputStream is;
     private int curByte;
     private int nextByte;
@@ -24,14 +23,6 @@ public class DummyBitstreamReader implements InBits {
     protected static int bitsRead;
 
     protected CharCache debugBits = new CharCache(50);
-
-    public static InBits wrap(byte[] buffer) {
-        try {
-            return new BitstreamReader(new ByteArrayInputStream(buffer));
-        } catch (IOException e) {
-            return null;
-        }
-    }
 
     public DummyBitstreamReader(InputStream is) throws IOException {
         this.is = is;

@@ -1,14 +1,12 @@
 package org.jcodec.samples.streaming;
 
-import static org.jcodec.common.JCodecUtil.bufin;
-import static org.jcodec.common.io.ReaderBE.readInt16;
-import static org.jcodec.common.io.ReaderBE.readInt32;
-import static org.jcodec.common.io.ReaderBE.readInt64;
 import static org.jcodec.containers.mps.MPSDemuxer.videoStream;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,11 +16,7 @@ import java.util.Set;
 
 import junit.framework.Assert;
 
-import org.apache.commons.io.IOUtils;
-import org.jcodec.common.ByteBufferUtil;
-import org.jcodec.common.io.FileRAOutputStream;
-import org.jcodec.common.io.RAInputStream;
-import org.jcodec.common.io.ReaderBE;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.TapeTimecode;
 
 /**
@@ -188,40 +182,39 @@ public class MTSIndex {
     }
 
     public static MTSIndex read(File indexFile) throws IOException {
-        RAInputStream is = bufin(indexFile);
+        FileChannel is = new FileInputStream(indexFile).getChannel();
         try {
             List<StreamEntry> streams = new ArrayList<StreamEntry>();
-            int nStreams = is.read();
+            int nStreams = NIOUtils.readByte(is) & 0xff;
             for (int i = 0; i < nStreams; i++) {
                 ArrayList<ByteBuffer> extraData = new ArrayList<ByteBuffer>();
-                long size = readInt64(is);
-                long pos = is.getPos();
-                int sid = is.read();
-                while (is.read() == 0) {
-                    ByteBuffer buffer = ByteBufferUtil.fetchFrom(is, (int) readInt16(is));
-                    extraData.add(buffer);
+                int size = NIOUtils.readInt(is);
+                long pos = is.position();
+                ByteBuffer buf = NIOUtils.fetchFrom(is, size);
+
+                int sid = buf.get() & 0xff;
+                while (buf.get() == 0) {
+                    extraData.add(NIOUtils.read(buf, buf.getShort() & 0xffff));
                 }
                 ArrayList<FrameEntry> frames = new ArrayList<FrameEntry>();
-                int nFrames = (int) readInt32(is);
-                for (int j = 0; j < nFrames; j++) {
+                for (int j = 0; j < buf.getInt(); j++) {
                     if (videoStream(sid)) {
-                        VideoFrameEntry e = new VideoFrameEntry(readInt64(is), ReaderBE.readInt64(is),
-                                (int) readInt32(is), j, (int) readInt32(is), (int) readInt32(is), (int) readInt32(is),
-                                (short) 0, (byte) 0);
-                        short doft = (short) readInt16(is);
+                        VideoFrameEntry e = new VideoFrameEntry(buf.getLong(), buf.getLong(), buf.getInt(), j,
+                                buf.getInt(), buf.getInt(), buf.getInt(), (short) 0, (byte) 0);
+                        int doft = buf.getShort() & 0xffff;
                         e.displayOrder = (short) (doft & 0x3ff);
                         e.frameType = (byte) (doft >> 10);
                         frames.add(e);
                     } else {
-                        frames.add(new FrameEntry(readInt64(is), ReaderBE.readInt64(is), (int) readInt32(is), j));
+                        frames.add(new FrameEntry(buf.getLong(), buf.getLong(), buf.getInt(), j));
                     }
                 }
-                Assert.assertEquals(is.getPos() - pos, size);
+                Assert.assertEquals(is.position() - pos, size);
                 streams.add(new StreamEntry(sid, extraData, frames));
             }
             return new MTSIndex(streams);
         } finally {
-            IOUtils.closeQuietly(is);
+            NIOUtils.closeQuietly(is);
         }
     }
 
@@ -230,48 +223,49 @@ public class MTSIndex {
     }
 
     public void write(File indexFile) throws IOException {
-        FileRAOutputStream out = null;
-        try {
-            out = new FileRAOutputStream(indexFile);
-            out.writeByte(streams.size());
-            for (StreamEntry streamEntry : streams.values()) {
-                long before = out.getPos();
-                out.writeLong(0);
-                writeStream(streamEntry, out);
-                long after = out.getPos();
-                out.seek(before);
-                out.writeLong(after - before - 8);
-                out.seek(after);
-            }
-        } finally {
-            IOUtils.closeQuietly(out);
+
+        int size = 1024;
+        for (StreamEntry streamEntry : streams.values()) {
+            size += streamEntry.frames.size() * 36;
         }
+        ByteBuffer buf = ByteBuffer.allocate(size);
+
+        buf.put((byte) streams.size());
+        for (StreamEntry streamEntry : streams.values()) {
+            ByteBuffer fork = buf.duplicate();
+            buf.putInt(0);
+            writeStream(streamEntry, buf);
+            fork.putInt(buf.position() - fork.position() - 8);
+        }
+        buf.flip();
+
+        NIOUtils.writeTo(buf, indexFile);
     }
 
-    private void writeStream(StreamEntry streamEntry, FileRAOutputStream out) throws IOException {
-        out.writeByte(streamEntry.sid);
+    private void writeStream(StreamEntry streamEntry, ByteBuffer out) {
+        out.put((byte) streamEntry.sid);
         for (ByteBuffer buffer : streamEntry.extraData) {
-            out.writeByte(0);
-            out.writeShort(buffer.remaining());
-            ByteBufferUtil.writeTo(buffer, out);
+            out.put((byte) 0);
+            out.putShort((short) buffer.remaining());
+            NIOUtils.write(out, buffer);
         }
-        out.writeByte(1);
-        out.writeInt(streamEntry.frames.size());
+        out.put((byte) 1);
+        out.putInt(streamEntry.frames.size());
         for (FrameEntry frameEntry : streamEntry.frames) {
             writeFrame(frameEntry, out);
         }
     }
 
-    private void writeFrame(FrameEntry frameEntry, FileRAOutputStream out) throws IOException {
-        out.writeLong(frameEntry.dataOffset);
-        out.writeLong(frameEntry.pts);
-        out.writeInt(frameEntry.duration);
+    private void writeFrame(FrameEntry frameEntry, ByteBuffer out) {
+        out.putLong(frameEntry.dataOffset);
+        out.putLong(frameEntry.pts);
+        out.putInt(frameEntry.duration);
         if (frameEntry instanceof VideoFrameEntry) {
             VideoFrameEntry vfe = (VideoFrameEntry) frameEntry;
-            out.writeInt(vfe.edInd);
-            out.writeInt(vfe.gopId);
-            out.writeInt(vfe.timeCode);
-            out.writeShort(vfe.displayOrder | (vfe.frameType << 10));
+            out.putInt(vfe.edInd);
+            out.putInt(vfe.gopId);
+            out.putInt(vfe.timeCode);
+            out.putShort((short) (vfe.displayOrder | (vfe.frameType << 10)));
         }
     }
 

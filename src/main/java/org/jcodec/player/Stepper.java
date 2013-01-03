@@ -11,7 +11,7 @@ import java.util.concurrent.Executors;
 
 import javax.sound.sampled.AudioFormat;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.AudioFrame;
 import org.jcodec.common.model.Frame;
 import org.jcodec.common.model.Picture;
@@ -134,7 +134,7 @@ public class Stepper {
             if (frame == null)
                 break;
             ByteBuffer data = frame.getData();
-            ByteBufferUtil.write(sound, ByteBufferUtil.sub(data, Math.min(data.remaining(), sound.remaining())));
+            NIOUtils.write(sound, NIOUtils.read(data, Math.min(data.remaining(), sound.remaining())));
         }
         sound.flip();
 

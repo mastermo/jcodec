@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 
 import org.jcodec.codecs.h264.io.model.NALUnit;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -29,7 +29,7 @@ public class NALUnitWriter {
 
     public void writeUnit(NALUnit nal, ByteBuffer data) throws IOException {
         ByteBuffer emprev = ByteBuffer.allocate(data.remaining() + 1024);
-        ByteBufferUtil.write(emprev, _MARKER);
+        NIOUtils.write(emprev, _MARKER);
         nal.write(emprev);
         emprev(emprev, data);
         emprev.flip();

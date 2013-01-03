@@ -10,7 +10,7 @@ import java.util.Map;
 
 import org.jcodec.codecs.mpeg12.MPEGES;
 import org.jcodec.codecs.mpeg12.SegmentReader;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 
 /**
@@ -83,7 +83,7 @@ public class MPSDemuxer extends SegmentReader {
 
         public int read(ByteBuffer arg0) throws IOException {
             PESPacket pes = pending.size() > 0 ? pending.remove(0) : getPacket();
-            ByteBufferUtil.write(arg0, pes.data);
+            NIOUtils.write(arg0, pes.data);
             return pes.data.remaining();
         }
 
@@ -201,7 +201,7 @@ public class MPSDemuxer extends SegmentReader {
             skipToMarker();
 
         readToNextMarker(dup);
-        ByteBuffer fork = ByteBufferUtil.from(dup, 4);
+        ByteBuffer fork = NIOUtils.from(dup, 4);
         PESPacket pkt = readPES(fork, curPos());
         if (pkt.length == 0) {
             while ((curMarker < PRIVATE_1 || curMarker > VIDEO_MAX) && readToNextMarker(dup))
@@ -261,11 +261,11 @@ public class MPSDemuxer extends SegmentReader {
         long pts = -1, dts = -1;
         if ((flags2 & 0xc0) == 0x80) {
             pts = readTs(is);
-            ByteBufferUtil.skip(is, header_len - 5);
+            NIOUtils.skip(is, header_len - 5);
         } else if ((flags2 & 0xc0) == 0xc0) {
             pts = readTs(is);
             dts = readTs(is);
-            ByteBufferUtil.skip(is, header_len - 10);
+            NIOUtils.skip(is, header_len - 10);
         }
 
         return new PESPacket(null, pts, streamId, len, pos);

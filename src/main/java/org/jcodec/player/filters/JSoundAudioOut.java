@@ -10,7 +10,7 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.SourceDataLine;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -93,7 +93,7 @@ public class JSoundAudioOut implements AudioOut {
         if (sound.hasArray()) {
             written = line.write(sound.array(), sound.arrayOffset() + sound.position(), sound.remaining());
         } else {
-            byte[] array = ByteBufferUtil.toArray(sound);
+            byte[] array = NIOUtils.toArray(sound);
             written = line.write(array, 0, array.length);
         }
         sound.position(sound.position() + written);

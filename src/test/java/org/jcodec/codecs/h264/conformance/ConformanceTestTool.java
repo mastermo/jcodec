@@ -11,7 +11,7 @@ import java.io.InputStream;
 import org.apache.commons.io.IOUtils;
 import org.jcodec.codecs.h264.H264Decoder;
 import org.jcodec.codecs.h264.annexb.MappedH264ES;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 
@@ -94,7 +94,7 @@ public class ConformanceTestTool {
             InputStream is = null;
             try {
                 is = new BufferedInputStream(new FileInputStream(coded));
-                MappedH264ES demuxer = new MappedH264ES(ByteBufferUtil.map(coded));
+                MappedH264ES demuxer = new MappedH264ES(NIOUtils.map(coded));
                 H264Decoder decoder = new H264Decoder();
                 Picture buf = Picture.create(1920, 1088, ColorSpace.YUV420);
                 Picture pic;

@@ -1,6 +1,6 @@
 package org.jcodec.codecs.h264;
 
-import static org.jcodec.common.ByteBufferUtil.map;
+import static org.jcodec.common.NIOUtils.map;
 
 import java.io.IOException;
 

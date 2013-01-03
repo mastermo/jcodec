@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 import org.junit.Test;
 
@@ -23,12 +23,12 @@ public class TestMPEGES {
         MPEGES mpeges = new MPEGES(Channels.newChannel(new ByteArrayInputStream(mpeg)), 32);
         ByteBuffer buf = ByteBuffer.allocate(1024);
         Packet f1 = mpeges.getFrame(buf);
-        assertArrayEquals(frame1, ByteBufferUtil.toArray(f1.getData()));
+        assertArrayEquals(frame1, NIOUtils.toArray(f1.getData()));
 
         Packet f2 = mpeges.getFrame(buf);
-        assertArrayEquals(frame1, ByteBufferUtil.toArray(f2.getData()));
+        assertArrayEquals(frame1, NIOUtils.toArray(f2.getData()));
 
         Packet f3 = mpeges.getFrame(buf);
-        assertArrayEquals(frame2, ByteBufferUtil.toArray(f3.getData()));
+        assertArrayEquals(frame2, NIOUtils.toArray(f3.getData()));
     }
 }

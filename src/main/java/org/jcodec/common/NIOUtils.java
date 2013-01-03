@@ -11,8 +11,10 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 
 import org.apache.commons.io.IOUtils;
 
@@ -23,7 +25,7 @@ import org.apache.commons.io.IOUtils;
  * @author Jay Codec
  * 
  */
-public class ByteBufferUtil {
+public class NIOUtils {
 
     public static ByteBuffer search(ByteBuffer buf, int n, byte... param) {
         ByteBuffer result = buf.duplicate();
@@ -53,7 +55,7 @@ public class ByteBufferUtil {
         return result;
     }
 
-    public static final ByteBuffer sub(ByteBuffer from, int count) {
+    public static final ByteBuffer read(ByteBuffer from, int count) {
         ByteBuffer slice = from.duplicate();
         int limit = from.position() + count;
         slice.limit(limit);
@@ -63,21 +65,21 @@ public class ByteBufferUtil {
 
     public static ByteBuffer fetchFrom(InputStream is, int size) throws IOException {
         byte[] buffer = new byte[size];
-        return ByteBuffer.wrap(buffer, 0, ByteBufferUtil.read(buffer, 0, size, is));
+        return ByteBuffer.wrap(buffer, 0, NIOUtils.read(buffer, 0, size, is));
     }
 
     public static ByteBuffer fetchFrom(RandomAccessFile file, int size) throws IOException {
         byte[] buffer = new byte[size];
-        return ByteBuffer.wrap(buffer, 0, ByteBufferUtil.read(buffer, 0, size, file));
+        return ByteBuffer.wrap(buffer, 0, NIOUtils.read(buffer, 0, size, file));
     }
 
     public static ByteBuffer fetchFrom(File file) throws IOException {
-        return ByteBufferUtil.fetchFrom(file, (int) file.length());
+        return NIOUtils.fetchFrom(file, (int) file.length());
     }
-    
+
     public static ByteBuffer fetchFrom(ReadableByteChannel ch, int size) throws IOException {
         ByteBuffer buf = ByteBuffer.allocate(size);
-        ByteBufferUtil.read(ch, buf);
+        NIOUtils.read(ch, buf);
         buf.flip();
         return buf;
     }
@@ -130,7 +132,7 @@ public class ByteBufferUtil {
         if (buf.hasArray()) {
             file.write(buf.array(), buf.arrayOffset() + buf.position(), buf.remaining());
         } else {
-            file.write(ByteBufferUtil.toArray(buf), 0, buf.remaining());
+            file.write(NIOUtils.toArray(buf), 0, buf.remaining());
         }
     }
 
@@ -236,5 +238,81 @@ public class ByteBufferUtil {
         }
         result.flip();
         return result;
+    }
+
+    public static ByteBuffer combine(ByteBuffer... buf) {
+        return combine(buf);
+    }
+
+    public static String readString(ByteBuffer is, int i) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public static String readPascalString(ByteBuffer is, int i) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public static void writePascalString(ByteBuffer out, String compressorName, int i) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public static void writePascalString(ByteBuffer out, String name) {
+        out.put((byte) name.length());
+        out.put(JCodecUtil.asciiString(name));
+    }
+
+    public static String readPascalString(ByteBuffer input) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public static String readNullTermString(ByteBuffer input) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public static ByteBuffer read(ByteBuffer input) {
+        ByteBuffer result = input.duplicate();
+        input.position(input.limit());
+        return result;
+    }
+
+    public static void copy(ReadableByteChannel input, WritableByteChannel out, long amount) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(8192);
+        int read;
+        do {
+            buf.position(0);
+            buf.limit((int) Math.min(amount, buf.capacity()));
+            read = input.read(buf);
+            if (read != -1) {
+                buf.flip();
+                out.write(buf);
+                amount -= read;
+            }
+        } while (read != -1 && amount > 0);
+    }
+
+    public static void closeQuietly(FileChannel out) {
+        if (out == null)
+            return;
+        try {
+            out.close();
+        } catch (IOException e) {
+        }
+    }
+
+    public static byte readByte(FileChannel is) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(1);
+        is.read(buf);
+        return buf.get();
+    }
+
+    public static int readInt(FileChannel is) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(4);
+        is.read(buf);
+        return buf.getInt();
     }
 }

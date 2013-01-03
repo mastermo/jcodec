@@ -1,18 +1,12 @@
 package org.jcodec.codecs.h264.mp4;
 
-import java.io.DataOutput;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jcodec.codecs.h264.StreamParams;
-import org.jcodec.codecs.h264.io.model.PictureParameterSet;
-import org.jcodec.codecs.h264.io.model.SeqParameterSet;
-import org.jcodec.codecs.wav.StringReader;
-import org.jcodec.common.ByteBufferUtil;
-import org.jcodec.common.io.ReaderBE;
+import junit.framework.Assert;
+
+import org.jcodec.common.NIOUtils;
 import org.jcodec.containers.mp4.boxes.Box;
 import org.jcodec.containers.mp4.boxes.Header;
 
@@ -25,10 +19,10 @@ import org.jcodec.containers.mp4.boxes.Header;
  * @author Jay Codec
  * 
  */
-public class AvcCBox extends Box implements StreamParams {
+public class AvcCBox extends Box {
 
-    private List<SeqParameterSet> spsList = new ArrayList<SeqParameterSet>();
-    private List<PictureParameterSet> ppsList = new ArrayList<PictureParameterSet>();
+    private List<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
+    private List<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
 
     public AvcCBox(Box other) {
         super(other);
@@ -42,7 +36,7 @@ public class AvcCBox extends Box implements StreamParams {
         super(header);
     }
 
-    public AvcCBox(List<SeqParameterSet> spsList, List<PictureParameterSet> ppsList) {
+    public AvcCBox(List<ByteBuffer> spsList, List<ByteBuffer> ppsList) {
         this();
         this.spsList = spsList;
         this.ppsList = ppsList;
@@ -53,98 +47,53 @@ public class AvcCBox extends Box implements StreamParams {
     }
 
     @Override
-    public void parse(InputStream input) throws IOException {
-        StringReader.sureSkip(input, 5);
-        int nSPS = input.read() & 0x1f; // 3 bits reserved + 5 bits number of
-                                        // sps
+    public void parse(ByteBuffer input) {
+        NIOUtils.skip(input, 5);
+
+        int nSPS = input.get() & 0x1f; // 3 bits reserved + 5 bits number of
+                                       // sps
         for (int i = 0; i < nSPS; i++) {
-            int spsSize = (int) ReaderBE.readInt16(input);
-            byte[] sps = new byte[spsSize];
-            input.read(sps);
-            spsList.add(SeqParameterSet.read(ByteBuffer.wrap(sps, 1, spsSize - 1)));
+            int spsSize = input.getShort();
+            Assert.assertEquals(0x67, input.get() & 0xff);
+            spsList.add(NIOUtils.read(input, spsSize));
         }
 
-        int nPPS = input.read() & 0xff;
+        int nPPS = input.get() & 0xff;
         for (int i = 0; i < nPPS; i++) {
-            int ppsSize = (int) ReaderBE.readInt16(input);
-            byte[] pps = new byte[ppsSize];
-            input.read(pps);
-            ppsList.add(PictureParameterSet.read(ByteBuffer.wrap(pps, 1, ppsSize - 1)));
+            int ppsSize = input.getShort();
+            Assert.assertEquals(0x68, input.get() & 0xff);
+            ppsList.add(NIOUtils.read(input, ppsSize));
         }
     }
 
     @Override
-    protected void doWrite(DataOutput out) throws IOException {
-        out.write(0x1);
-        out.write(0x64);
-        out.write(0x0);
-        out.write(0x1e);
-        out.write(0xff);
+    protected void doWrite(ByteBuffer out) {
+        out.put((byte) 0x1);
+        out.put((byte) 0x64);
+        out.put((byte) 0x0);
+        out.put((byte) 0x1e);
+        out.put((byte) 0xff);
 
-        out.write(spsList.size() | 0xe0);
-        for (SeqParameterSet sps : spsList) {
-            byte[] b = toByteArray(sps);
-            out.writeShort(b.length + 1);
-            out.write(0x67);
-            out.write(b);
+        out.put((byte) (spsList.size() | 0xe0));
+        for (ByteBuffer sps : spsList) {
+            out.putShort((short) (sps.remaining() + 1));
+            out.put((byte) 0x67);
+            NIOUtils.write(out, sps);
         }
 
-        out.write(ppsList.size());
-        for (PictureParameterSet pps : ppsList) {
-            byte[] b = toByteArray(pps);
-            out.writeShort(b.length + 1);
-            out.write(0x68);
-            out.write(b);
+        out.put((byte) ppsList.size());
+        for (ByteBuffer pps : ppsList) {
+            out.putShort((byte) (pps.remaining() + 1));
+            out.put((byte) 0x68);
+            NIOUtils.write(out, pps);
         }
     }
 
-    private static byte[] toByteArray(SeqParameterSet sps) {
-        ByteBuffer out = ByteBuffer.allocate(1024);
-        sps.write(out);
-        out.flip();
-        return ByteBufferUtil.toArray(out);
-    }
-
-    private static byte[] toByteArray(PictureParameterSet pps) {
-        ByteBuffer out = ByteBuffer.allocate(1024);
-        pps.write(out);
-        out.flip();
-        return ByteBufferUtil.toArray(out);
-    }
-
-    public List<SeqParameterSet> getSpsList() {
+    public List<ByteBuffer> getSpsList() {
         return spsList;
     }
 
-    public List<PictureParameterSet> getPpsList() {
+    public List<ByteBuffer> getPpsList() {
         return ppsList;
-    }
-
-    public SeqParameterSet getSPS(int id) {
-        for (SeqParameterSet sps : spsList) {
-            if (sps.seq_parameter_set_id == id)
-                return sps;
-        }
-        return null;
-    }
-
-    public PictureParameterSet getPPS(int id) {
-        for (PictureParameterSet pps : ppsList) {
-            if (pps.pic_parameter_set_id == id)
-                return pps;
-        }
-        return null;
-    }
-    
-    public AvcCBox copy() {
-        List<SeqParameterSet> nSpsList = new ArrayList<SeqParameterSet>();
-        for (SeqParameterSet sps : spsList) {
-            nSpsList.add(sps.copy());
-        }
-        List<PictureParameterSet> nPpsList = new ArrayList<PictureParameterSet>();
-        for (PictureParameterSet pps : ppsList) {
-            nPpsList.add(pps.copy());
-        }
-        return new AvcCBox(nSpsList, nPpsList);
     }
 }

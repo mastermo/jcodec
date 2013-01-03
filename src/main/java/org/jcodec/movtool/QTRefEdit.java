@@ -75,7 +75,7 @@ public class QTRefEdit {
         
         MovieBox ref = MP4Util.createRefMovie(input);
         applyCommands(ref, commands);
-        ref.write(output);
+        MP4Util.writeMovie(output, ref);
         System.out.println("INFO: Created reference file: "+output.getAbsolutePath());
     }
     

@@ -18,7 +18,7 @@ import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.codecs.h264.io.write.NALUnitWriter;
 import org.jcodec.codecs.h264.io.write.SliceHeaderWriter;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.BitWriter;
 
@@ -45,7 +45,7 @@ public class H264Mashup {
 
     public void mashup(File if1, File if2, File of) throws IOException {
         {
-            MappedByteBuffer map = ByteBufferUtil.map(if1);
+            MappedByteBuffer map = NIOUtils.map(if1);
             FileOutputStream os = null;
             try {
                 os = new FileOutputStream(of);
@@ -59,7 +59,7 @@ public class H264Mashup {
         {
             FileOutputStream os = null;
             try {
-                MappedByteBuffer map = ByteBufferUtil.map(if1);
+                MappedByteBuffer map = NIOUtils.map(if1);
                 os = new FileOutputStream(of, true);
 
                 NALUnitWriter out = new NALUnitWriter(os.getChannel());

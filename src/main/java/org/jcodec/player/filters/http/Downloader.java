@@ -22,7 +22,8 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.params.CookiePolicy;
 import org.apache.http.util.EntityUtils;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
+import org.jcodec.common.JCodecUtil;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.TapeTimecode;
 import org.jcodec.player.filters.MediaInfo;
@@ -86,15 +87,15 @@ public class Downloader {
     }
 
     private static List<Packet> parseMultipart(ByteBuffer buffer, String contentType) {
-        byte[] sep1 = ("\r\n--" + contentType.split(";")[1].split("=")[1]).getBytes();
+        byte[] sep1 = JCodecUtil.asciiString("\r\n--" + contentType.split(";")[1].split("=")[1]);
 
         List<Packet> result = new ArrayList<Packet>();
         ByteBuffer to;
         do {
-            ByteBufferUtil.search(buffer, 0, (byte) 13, (byte) 10);
+            NIOUtils.search(buffer, 0, (byte) 13, (byte) 10);
             buffer.getShort();
-            ByteBufferUtil.search(buffer, 0, sep1);
-            to = ByteBufferUtil.search(buffer, 0, sep1);
+            NIOUtils.search(buffer, 0, sep1);
+            to = NIOUtils.search(buffer, 0, sep1);
             if (to != null) {
                 result.add(part(to));
                 buffer.getShort();
@@ -153,7 +154,7 @@ public class Downloader {
     }
 
     private static String[] getLines(ByteBuffer read) {
-        return StringUtils.split(new String(ByteBufferUtil.toArray(read)), "\r\n");
+        return StringUtils.split(new String(NIOUtils.toArray(read)), "\r\n");
     }
 
     private ByteBuffer toBuffer(ByteBuffer bfr, HttpEntity entity) throws IOException {
@@ -161,7 +162,7 @@ public class Downloader {
         try {
             in = entity.getContent();
             ByteBuffer fork = bfr.duplicate();
-            ByteBufferUtil.fetch(fork, in);
+            NIOUtils.fetch(fork, in);
             fork.flip();
             return fork;
         } finally {

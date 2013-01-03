@@ -15,7 +15,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.jetty.util.MultiPartOutputStream;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.TapeTimecode;
 import org.jcodec.player.filters.MediaInfo;
@@ -150,7 +150,7 @@ public class StreamingServlet extends HttpServlet {
 
         out.startPart("application/octet-stream", headers.toArray(new String[0]));
 
-        ByteBufferUtil.writeTo(packet.getData(), out);
+        NIOUtils.writeTo(packet.getData(), out);
     }
 
     private void outGOPs(HttpServletResponse resp, VideoAdapterTrack track, int frameS, int frameE) throws IOException {
@@ -199,7 +199,7 @@ public class StreamingServlet extends HttpServlet {
 
             out.startPart("application/octet-stream", headers.toArray(new String[0]));
 
-            ByteBufferUtil.writeTo(packet.getData(), out);
+            NIOUtils.writeTo(packet.getData(), out);
         }
     }
 

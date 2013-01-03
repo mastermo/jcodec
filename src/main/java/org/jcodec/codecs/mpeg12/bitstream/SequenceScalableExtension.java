@@ -1,10 +1,7 @@
 package org.jcodec.codecs.mpeg12.bitstream;
 
-import java.io.IOException;
-
 import org.jcodec.common.io.BitReader;
-import org.jcodec.common.io.InBits;
-import org.jcodec.common.io.OutBits;
+import org.jcodec.common.io.BitWriter;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -59,7 +56,7 @@ public class SequenceScalableExtension {
         return sse;
     }
 
-    public void write(OutBits out) throws IOException {
+    public void write(BitWriter out) {
         out.writeNBit(scalable_mode, 2);
         out.writeNBit(layer_id, 4);
 

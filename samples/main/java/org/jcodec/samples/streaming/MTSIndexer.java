@@ -2,7 +2,7 @@ package org.jcodec.samples.streaming;
 
 import static ch.lambdaj.Lambda.extract;
 import static ch.lambdaj.Lambda.on;
-import static org.jcodec.common.ByteBufferUtil.from;
+import static org.jcodec.common.NIOUtils.from;
 import static org.jcodec.containers.mps.MPSDemuxer.videoStream;
 import gnu.trove.map.hash.TIntObjectHashMap;
 

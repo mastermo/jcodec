@@ -13,7 +13,7 @@ import junit.framework.TestCase;
 import org.apache.commons.io.IOUtils;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.VUIParameters;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -75,7 +75,7 @@ public class TestSPS extends TestCase {
         String path = "src/test/resources/h264/sps/sps1.dat";
         BufferedInputStream is = null;
         try {
-            SeqParameterSet sps = SeqParameterSet.read(ByteBufferUtil.fetchFrom(new File(path)));
+            SeqParameterSet sps = SeqParameterSet.read(NIOUtils.fetchFrom(new File(path)));
 
             assertEquals(sps.profile_idc, 66);
 
@@ -129,9 +129,9 @@ public class TestSPS extends TestCase {
         ByteBuffer bb = ByteBuffer.allocate(1024);
         sps1.write(bb);
 
-        ByteBuffer expect = ByteBufferUtil.fetchFrom(new File(path));
+        ByteBuffer expect = NIOUtils.fetchFrom(new File(path));
 
-        Assert.assertArrayEquals(ByteBufferUtil.toArray(bb), ByteBufferUtil.toArray(expect));
+        Assert.assertArrayEquals(NIOUtils.toArray(bb), NIOUtils.toArray(expect));
 
     }
 }

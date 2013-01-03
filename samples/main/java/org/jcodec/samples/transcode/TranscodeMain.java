@@ -1,19 +1,18 @@
 package org.jcodec.samples.transcode;
 
 import static java.lang.String.format;
-import static org.jcodec.common.JCodecUtil.bufin;
 import static org.jcodec.common.model.ColorSpace.RGB;
 import static org.jcodec.common.model.ColorSpace.YUV420;
 import static org.jcodec.common.model.Rational.HALF;
 import static org.jcodec.common.model.Unit.SEC;
 
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.EnumSet;
 
 import javax.imageio.ImageIO;
@@ -22,8 +21,6 @@ import org.jcodec.codecs.prores.ProresDecoder;
 import org.jcodec.codecs.prores.ProresEncoder;
 import org.jcodec.codecs.prores.ProresEncoder.Profile;
 import org.jcodec.codecs.y4m.Y4MDecoder;
-import org.jcodec.common.io.FileRAOutputStream;
-import org.jcodec.common.io.RAOutputStream;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Picture;
@@ -70,19 +67,16 @@ public class TranscodeMain {
     }
 
     static void y4m2prores(String input, String output) throws Exception {
-        InputStream y4m;
-        if ("-".equals(input)) {
-            y4m = System.in;
-        } else {
-            y4m = new BufferedInputStream(new FileInputStream(input));
-        }
+        FileChannel y4m = new FileInputStream(input).getChannel();
 
         Y4MDecoder frames = new Y4MDecoder(y4m);
 
-        RAOutputStream sink = null;
+        Picture outPic = Picture.create(frames.getWidth(), frames.getHeight(), ColorSpace.YUV420);
+
+        FileChannel sink = null;
         MP4Muxer muxer = null;
         try {
-            sink = new FileRAOutputStream(new File(output));
+            sink = new FileOutputStream(new File(output)).getChannel();
             Rational fps = frames.getFps();
             if (fps == null) {
                 System.out.println("Can't get fps from the input, assuming 24");
@@ -99,7 +93,7 @@ public class TranscodeMain {
             Picture frame;
             int i = 0;
             ByteBuffer buf = ByteBuffer.allocate(frames.getSize().getWidth() * frames.getSize().getHeight() * 6);
-            while ((frame = frames.nextFrame()) != null) {
+            while ((frame = frames.nextFrame(outPic.getData())) != null) {
                 color.transform(frame, picture);
                 ByteBuffer ff = encoder.encodeFrame(buf, picture);
                 videoTrack.addFrame(new MP4Packet(ff, i * fps.getDen(), fps.getNum(), fps.getDen(), i, true, null, i
@@ -122,7 +116,7 @@ public class TranscodeMain {
             return;
         }
 
-        MP4Demuxer rawDemuxer = new MP4Demuxer(bufin(file));
+        MP4Demuxer rawDemuxer = new MP4Demuxer(new FileInputStream(file).getChannel());
         FramesTrack videoTrack = (FramesTrack) rawDemuxer.getVideoTrack();
         if (videoTrack == null) {
             System.out.println("Video track not found");
@@ -156,9 +150,9 @@ public class TranscodeMain {
             return;
         }
 
-        RAOutputStream sink = null;
+        FileChannel sink = null;
         try {
-            sink = new FileRAOutputStream(new File(out));
+            sink = new FileOutputStream(new File(out)).getChannel();
             MP4Muxer muxer = new MP4Muxer(sink);
             ProresEncoder encoder = new ProresEncoder(profile);
             RgbToYuv422 transform = new RgbToYuv422(2, 0);

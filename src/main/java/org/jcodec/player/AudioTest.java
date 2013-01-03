@@ -10,7 +10,7 @@ import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.player.filters.AudioOut;
 import org.jcodec.player.filters.JSoundAudioOut;
 import org.jcodec.player.filters.MediaInfo.AudioInfo;
@@ -77,7 +77,7 @@ public class AudioTest {
         Clip clip = AudioSystem.getClip();
         ByteBuffer bb = ByteBuffer.allocate(af.getFrameSize() * audioInfo.getFramesPerPacket() * 2000);
         tone.getFrame(bb);
-        byte[] array = ByteBufferUtil.toArray(bb);
+        byte[] array = NIOUtils.toArray(bb);
         clip.open(af, array, 0, array.length);
         clip.start();
         clip.drain();

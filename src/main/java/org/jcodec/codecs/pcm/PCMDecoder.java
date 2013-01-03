@@ -3,7 +3,7 @@ package org.jcodec.codecs.pcm;
 import java.nio.ByteBuffer;
 
 import org.jcodec.common.AudioDecoder;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.AudioBuffer;
 import org.jcodec.player.filters.MediaInfo;
 import org.jcodec.player.filters.MediaInfo.AudioInfo;
@@ -25,7 +25,7 @@ public class PCMDecoder implements AudioDecoder {
 
     public AudioBuffer decodeFrame(ByteBuffer frame, ByteBuffer dst) {
         ByteBuffer dup = dst.duplicate();
-        ByteBufferUtil.write(dst, frame);
+        NIOUtils.write(dst, frame);
 
         dup.flip();
         return new AudioBuffer(dup, audioInfo.getFormat(), audioInfo.getFramesPerPacket());

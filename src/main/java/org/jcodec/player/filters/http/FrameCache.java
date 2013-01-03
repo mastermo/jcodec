@@ -5,8 +5,6 @@ import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -14,8 +12,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jcodec.common.ByteBufferUtil;
-import org.jcodec.common.io.Buffer;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.TapeTimecode;
 import org.jcodec.player.filters.MediaInfo;
@@ -97,12 +94,11 @@ public class FrameCache {
                 dataSegments.add(f.getFilePointer());
                 f.seek(f.getFilePointer() + segmentSize);
             } else if (segmentType == INDEX_SEGMENT) {
-                Buffer buffer = Buffer.fetchFrom(f, segmentSize);
-                DataInput dinp = buffer.dinp();
+                ByteBuffer buffer = NIOUtils.fetchFrom(f, segmentSize);
                 while (buffer.remaining() >= 29) {
-                    int frameNo = dinp.readInt();
-                    IndexRecord rec = new IndexRecord(frameNo, dinp.readLong(), dinp.readInt(), dinp.readLong(),
-                            dinp.readInt(), dinp.readByte() == 1, null);
+                    int frameNo = buffer.getInt();
+                    IndexRecord rec = new IndexRecord(frameNo, buffer.getLong(), buffer.getInt(), buffer.getLong(),
+                            buffer.getInt(), buffer.get() == 1, null);
                     index.put(frameNo, rec);
                     pts2frame.put(rec.pts, frameNo);
                 }
@@ -134,7 +130,7 @@ public class FrameCache {
             int dsOff = (int) (record.pos - getDataSegmentOff(record));
             while (out.remaining() > 0) {
                 int toRead = Math.min(out.remaining(), DATASEG_SIZE - dsOff);
-                ByteBufferUtil.read(fd.getChannel(), out, toRead);
+                NIOUtils.read(fd.getChannel(), out, toRead);
                 if (out.remaining() > 0) {
                     skipToDataseg();
                     dsOff = 0;
@@ -204,7 +200,7 @@ public class FrameCache {
             index.put((int) packet.getFrameNo(), record);
 
             while (data.remaining() > 0) {
-                ByteBuffer piece = ByteBufferUtil.sub(data, Math.min(data.remaining(), DATASEG_SIZE - dsFill));
+                ByteBuffer piece = NIOUtils.read(data, Math.min(data.remaining(), DATASEG_SIZE - dsFill));
                 fd.getChannel().write(piece);
                 dsFill += piece.remaining();
 
@@ -237,17 +233,17 @@ public class FrameCache {
     private void writeIndex(RandomAccessFile fd, List<IndexRecord> dsFrames) throws IOException {
         fd.write(INDEX_SEGMENT);
         fd.writeInt(dsFrames.size() * 29);
-        Buffer buf = new Buffer(dsFrames.size() * 29), fork = buf.fork();
-        DataOutput dout = buf.dout();
+        ByteBuffer buf = ByteBuffer.allocate(dsFrames.size() * 29);
         for (IndexRecord indexRecord : dsFrames) {
-            dout.writeInt(indexRecord.frameNo);
-            dout.writeLong(indexRecord.pos);
-            dout.writeInt(indexRecord.dataLen);
-            dout.writeLong(indexRecord.pts);
-            dout.writeInt(indexRecord.duration);
-            dout.write(indexRecord.key ? 1 : 0);
+            buf.putInt(indexRecord.frameNo);
+            buf.putLong(indexRecord.pos);
+            buf.putInt(indexRecord.dataLen);
+            buf.putLong(indexRecord.pts);
+            buf.putInt(indexRecord.duration);
+            buf.put((byte) (indexRecord.key ? 1 : 0));
         }
-        fork.writeTo(fd);
+        buf.flip();
+        NIOUtils.writeTo(buf, fd);
     }
 
     public boolean hasFrame(int i) {

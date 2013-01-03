@@ -206,7 +206,7 @@ public class TestBitReader {
     public void testReader5() throws Exception {
         BitReader in = new BitReader(ByteBuffer.wrap(FileUtils.readFileToByteArray(new File(
                 "src/test/resources/h264/bitstream/data.dat"))));
-        InBits in1 = new DummyBitstreamReader(new BufferedInputStream(new FileInputStream(
+        DummyBitstreamReader in1 = new DummyBitstreamReader(new BufferedInputStream(new FileInputStream(
                 "src/test/resources/h264/bitstream/data.dat")));
         String readFileToString = IOUtils.toString(new FileInputStream("src/test/resources/h264/bitstream/reads.csv"));
 

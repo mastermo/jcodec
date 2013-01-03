@@ -1,14 +1,14 @@
 package org.jcodec.samples.streaming;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.sound.sampled.AudioFormat;
 
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
@@ -36,10 +36,10 @@ import org.jcodec.player.filters.MediaInfo;
 public class QTAdapter implements Adapter {
     private MP4Demuxer demuxer;
     private ArrayList<AdapterTrack> tracks;
-    private RAInputStream is;
+    private FileChannel is;
 
     public QTAdapter(File file) throws IOException {
-        is = JCodecUtil.mapin(file);
+        is = new FileInputStream(file).getChannel();
 
         demuxer = new MP4Demuxer(is);
         tracks = new ArrayList<AdapterTrack>();

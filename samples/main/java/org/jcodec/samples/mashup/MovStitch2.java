@@ -1,13 +1,13 @@
 package org.jcodec.samples.mashup;
 
-import static org.jcodec.common.JCodecUtil.bufin;
 import static org.jcodec.containers.mp4.TrackType.VIDEO;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 
 import junit.framework.Assert;
 
@@ -19,10 +19,9 @@ import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.codecs.h264.io.write.SliceHeaderWriter;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.BitWriter;
-import org.jcodec.common.io.FileRAOutputStream;
 import org.jcodec.containers.mp4.Brand;
 import org.jcodec.containers.mp4.MP4Demuxer;
 import org.jcodec.containers.mp4.MP4Demuxer.DemuxerTrack;
@@ -30,6 +29,7 @@ import org.jcodec.containers.mp4.MP4DemuxerException;
 import org.jcodec.containers.mp4.MP4Muxer;
 import org.jcodec.containers.mp4.MP4Muxer.CompressedTrack;
 import org.jcodec.containers.mp4.MP4Packet;
+import org.jcodec.containers.mp4.MP4Util;
 import org.jcodec.containers.mp4.boxes.Box;
 import org.jcodec.containers.mp4.boxes.SampleEntry;
 import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
@@ -57,11 +57,11 @@ public class MovStitch2 {
 
     public static void changePPS(File in1, File in2, File out) throws IOException, MP4DemuxerException,
             FileNotFoundException {
-        MP4Muxer muxer = new MP4Muxer(new FileRAOutputStream(out), Brand.MOV);
+        MP4Muxer muxer = new MP4Muxer(new FileOutputStream(out).getChannel(), Brand.MOV);
 
-        MP4Demuxer demuxer1 = new MP4Demuxer(bufin(in1));
+        MP4Demuxer demuxer1 = new MP4Demuxer(new FileInputStream(in1).getChannel());
         DemuxerTrack vt1 = demuxer1.getVideoTrack();
-        MP4Demuxer demuxer2 = new MP4Demuxer(bufin(in2));
+        MP4Demuxer demuxer2 = new MP4Demuxer(new FileInputStream(in2).getChannel());
         DemuxerTrack vt2 = demuxer2.getVideoTrack();
         checkCompatible(vt1, vt2);
 
@@ -74,11 +74,13 @@ public class MovStitch2 {
         AvcCBox avcC = doSampleEntry(vt2, outTrack);
 
         SliceHeaderReader shr = new SliceHeaderReader();
-        SliceHeaderWriter shw = new SliceHeaderWriter(avcC.getSPS(0), avcC.getPPS(0));
+        SeqParameterSet sps = SeqParameterSet.read(avcC.getSpsList().get(0).duplicate());
+        PictureParameterSet pps = PictureParameterSet.read(avcC.getPpsList().get(0).duplicate());
+        SliceHeaderWriter shw = new SliceHeaderWriter(sps, pps);
 
         for (int i = 0; i < vt2.getFrameCount(); i++) {
             MP4Packet packet = vt2.getFrames(1);
-            ByteBuffer frm = doFrame(packet.getData(), shr, shw, avcC.getSpsList(), avcC.getPpsList());
+            ByteBuffer frm = doFrame(packet.getData(), shr, shw, sps, pps);
             outTrack.addFrame(new MP4Packet(packet, frm));
         }
 
@@ -103,7 +105,7 @@ public class MovStitch2 {
     }
 
     public static ByteBuffer doFrame(ByteBuffer data, SliceHeaderReader shr, SliceHeaderWriter shw,
-            List<SeqParameterSet> sps, List<PictureParameterSet> pps) throws IOException {
+            SeqParameterSet sps, PictureParameterSet pps) throws IOException {
         ByteBuffer result = ByteBuffer.allocate(data.remaining() + 24);
         while (data.remaining() > 0) {
             int len = data.getInt();
@@ -113,13 +115,13 @@ public class MovStitch2 {
 
                 ByteBuffer savePoint = result.duplicate();
                 result.getInt();
-                copyNU(shr, shw, nu, data, result, sps.get(0), pps.get(0));
+                copyNU(shr, shw, nu, data, result, sps, pps);
 
                 savePoint.putInt(savePoint.remaining() - result.remaining() - 4);
             } else {
                 result.putInt(len);
                 nu.write(result);
-                ByteBufferUtil.write(result, data);
+                NIOUtils.write(result, data);
             }
         }
 
@@ -147,16 +149,14 @@ public class MovStitch2 {
         SampleEntry se = videoTrack.getSampleEntries()[0];
 
         AvcCBox avcC = Box.findFirst(se, AvcCBox.class, AvcCBox.fourcc());
-        AvcCBox old = avcC.copy();
+        AvcCBox old = (AvcCBox) MP4Util.cloneBox(avcC, 2048);
 
-        for (PictureParameterSet pps : avcC.getPpsList()) {
-            Assert.assertTrue(pps.entropy_coding_mode_flag);
-            pps.seq_parameter_set_id = 1;
-            pps.pic_parameter_set_id = 1;
+        for (int i = 0; i < avcC.getPpsList().size(); i++) {
+            avcC.getPpsList().set(i, updatePps(avcC.getPpsList().get(i)));
         }
 
-        for (SeqParameterSet sps : avcC.getSpsList()) {
-            sps.seq_parameter_set_id = 1;
+        for (int i = 0; i < avcC.getSpsList().size(); i++) {
+            avcC.getSpsList().set(i, updateSps(avcC.getSpsList().get(i)));
         }
 
         return old;
@@ -172,5 +172,25 @@ public class MovStitch2 {
         int b;
         while ((b = r.readNBit(8)) != -1)
             w.writeNBit(b, 8);
+    }
+    
+    static ByteBuffer updateSps(ByteBuffer bb) {
+        SeqParameterSet sps = SeqParameterSet.read(bb);
+        sps.seq_parameter_set_id = 1;
+        ByteBuffer out = ByteBuffer.allocate(bb.capacity() + 10);
+        sps.write(out);
+        out.flip();
+        return out;
+    }
+
+    static ByteBuffer updatePps(ByteBuffer bb) {
+        PictureParameterSet pps = PictureParameterSet.read(bb);
+        Assert.assertTrue(pps.entropy_coding_mode_flag);
+        pps.seq_parameter_set_id = 1;
+        pps.pic_parameter_set_id = 1;
+        ByteBuffer out = ByteBuffer.allocate(bb.capacity() + 10);
+        pps.write(out);
+        out.flip();
+        return out;
     }
 }

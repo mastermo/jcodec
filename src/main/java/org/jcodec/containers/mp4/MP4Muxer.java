@@ -9,6 +9,7 @@ import gnu.trove.list.array.TLongArrayList;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -17,8 +18,6 @@ import javax.sound.sampled.AudioFormat;
 
 import junit.framework.Assert;
 
-import org.jcodec.common.ByteBufferUtil;
-import org.jcodec.common.io.RAOutputStream;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
@@ -85,24 +84,27 @@ public class MP4Muxer {
     private long mdatOffset;
 
     private int nextTrackId = 1;
-    private RAOutputStream out;
+    private FileChannel out;
 
-    public MP4Muxer(RAOutputStream output) throws IOException {
+    public MP4Muxer(FileChannel output) throws IOException {
         this(output, Brand.MP4);
     }
 
-    public MP4Muxer(RAOutputStream output, Brand brand) throws IOException {
+    public MP4Muxer(FileChannel output, Brand brand) throws IOException {
         this(output, brand.getFileTypeBox());
     }
 
-    public MP4Muxer(RAOutputStream output, FileTypeBox ftyp) throws IOException {
+    public MP4Muxer(FileChannel output, FileTypeBox ftyp) throws IOException {
         this.out = output;
 
-        ftyp.write(out);
-        new Header("wide", 8).write(output);
-        new Header("mdat", 1).write(output);
-        mdatOffset = output.getPos();
-        output.writeLong(0);
+        ByteBuffer buf = ByteBuffer.allocate(1024);
+        ftyp.write(buf);
+        new Header("wide", 8).write(buf);
+        new Header("mdat", 1).write(buf);
+        mdatOffset = buf.position();
+        buf.putLong(0);
+        buf.flip();
+        output.write(buf);
     }
 
     public CompressedTrack addVideoTrackWithTimecode(String fourcc, Size size, String encoderName, int timescale) {
@@ -147,7 +149,7 @@ public class MP4Muxer {
     }
 
     public static LeafBox terminatorAtom() {
-        return new LeafBox(new Header(new String(new byte[4])), new byte[0]);
+        return new LeafBox(new Header(new String(new byte[4])), ByteBuffer.allocate(0));
     }
 
     public TimecodeTrack addTimecodeTrack(int timescale) {
@@ -330,10 +332,10 @@ public class MP4Muxer {
             if (framesInCurChunk == 0)
                 return;
 
-            chunkOffsets.add(out.getPos());
+            chunkOffsets.add(out.position());
 
             for (ByteBuffer b : curChunk) {
-                ByteBufferUtil.writeTo(b, out);
+                out.write(b);
             }
             curChunk.clear();
 
@@ -641,11 +643,11 @@ public class MP4Muxer {
             if (curChunk.size() == 0)
                 return;
 
-            chunkOffsets.add(out.getPos());
+            chunkOffsets.add(out.position());
 
             for (ByteBuffer bs : curChunk) {
                 sampleSizes.add(bs.remaining());
-                ByteBufferUtil.writeTo(bs, out);
+                out.write(bs);
             }
 
             if (samplesInLastChunk == -1 || samplesInLastChunk != curChunk.size()) {
@@ -757,7 +759,7 @@ public class MP4Muxer {
     }
 
     public void writeHeader() throws IOException {
-        NodeBox movie = new MovieBox();
+        MovieBox movie = new MovieBox();
         MovieHeaderBox mvhd = movieHeader(movie);
         movie.addFirst(mvhd);
 
@@ -767,11 +769,11 @@ public class MP4Muxer {
                 movie.add(trak);
         }
 
-        long mdatSize = out.getPos() - mdatOffset + 8;
-        movie.write(out);
+        long mdatSize = out.position() - mdatOffset + 8;
+        MP4Util.writeMovie(out, movie);
 
-        out.seek(mdatOffset);
-        out.writeLong(mdatSize);
+        out.position(mdatOffset);
+        out.write(ByteBuffer.allocate(8).putLong(mdatSize));
     }
 
     private void mediaHeader(MediaInfoBox minf, TrackType type) {
@@ -805,7 +807,7 @@ public class MP4Muxer {
         minf.add(dinf);
         DataRefBox dref = new DataRefBox();
         dinf.add(dref);
-        dref.add(new LeafBox(new Header("alis", 0), new byte[] { 0, 0, 0, 1 }));
+        dref.add(new LeafBox(new Header("alis", 0), ByteBuffer.wrap(new byte[] { 0, 0, 0, 1 })));
     }
 
     public MuxerTrack getVideoTrack() {

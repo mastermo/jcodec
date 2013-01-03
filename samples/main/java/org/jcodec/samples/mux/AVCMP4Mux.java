@@ -1,10 +1,10 @@
 package org.jcodec.samples.mux;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.channels.FileChannel;
 
 import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.codecs.h264.io.model.NALUnit;
@@ -12,9 +12,7 @@ import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.ByteBufferUtil;
-import org.jcodec.common.io.FileRAOutputStream;
-import org.jcodec.common.io.RAOutputStream;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Size;
 import org.jcodec.containers.mp4.MP4Muxer;
 import org.jcodec.containers.mp4.MP4Muxer.CompressedTrack;
@@ -33,6 +31,8 @@ import org.jcodec.containers.mp4.boxes.SampleEntry;
  * 
  */
 public class AVCMP4Mux {
+    private static AvcCBox avcC;
+
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {
             System.out.println("Syntax: <in.264> <out.mp4>\n" + "\tWhere:\n"
@@ -43,31 +43,21 @@ public class AVCMP4Mux {
         File in = new File(args[0]);
         File out = new File(args[1]);
 
-        List<SeqParameterSet> spsList = new ArrayList<SeqParameterSet>();
-        List<PictureParameterSet> ppsList = new ArrayList<PictureParameterSet>();
-
-        RAOutputStream file = new FileRAOutputStream(out);
+        FileChannel file = new FileOutputStream(out).getChannel();
         MP4Muxer muxer = new MP4Muxer(file);
         CompressedTrack track = muxer.addTrackForCompressed(TrackType.VIDEO, 25);
 
-        mux(track, in, spsList, ppsList);
-
-        Size size = new Size((spsList.get(0).pic_width_in_mbs_minus1 + 1) << 4,
-                (spsList.get(0).pic_height_in_map_units_minus1 + 1) << 4);
-
-        SampleEntry se = MP4Muxer.videoSampleEntry("avc1", size, "JCodec");
-
-        se.add(new AvcCBox(spsList, ppsList));
-        track.addSampleEntry(se);
+        mux(track, in);
 
         muxer.writeHeader();
 
         file.close();
     }
 
-    private static void mux(CompressedTrack track, File f, List<SeqParameterSet> spsList,
-            List<PictureParameterSet> ppsList) throws IOException {
-        MappedH264ES es = new MappedH264ES(ByteBufferUtil.map(f));
+    private static void mux(CompressedTrack track, File f) throws IOException {
+        MappedH264ES es = new MappedH264ES(NIOUtils.map(f));
+
+        AvcCBox avcCBox = new AvcCBox();
 
         ByteBuffer frame = null;
         int i = 0;
@@ -82,18 +72,35 @@ public class AVCMP4Mux {
                         null, i, 0));
                 i++;
             } else if (nu.type == NALUnitType.SPS) {
-                spsList.add(SeqParameterSet.read(frame));
+                avcCBox.getSpsList().add(frame);
+                if (avcCBox.getSpsList().size() == 1) {
+                    addSampleEntry(track, SeqParameterSet.read(frame.duplicate()));
+                }
             } else if (nu.type == NALUnitType.PPS) {
-                ppsList.add(PictureParameterSet.read(frame));
+                avcCBox.getPpsList().add(frame);
             }
         } while (frame != null);
+    }
+
+    private static void addSampleEntry(CompressedTrack track, SeqParameterSet sps) {
+        Size size = new Size((sps.pic_width_in_mbs_minus1 + 1) << 4, (sps.pic_height_in_map_units_minus1 + 1) << 4);
+
+        SampleEntry se = MP4Muxer.videoSampleEntry("avc1", size, "JCodec");
+
+        avcC = new AvcCBox();
+        se.add(avcC);
+        track.addSampleEntry(se);
+    }
+
+    void addSP(SeqParameterSet sps, PictureParameterSet pps) {
+
     }
 
     private static ByteBuffer formPacket(NALUnit nu, ByteBuffer nextNALUnit) throws IOException {
         ByteBuffer out = ByteBuffer.allocate(nextNALUnit.remaining() + 5);
         out.putInt(nextNALUnit.remaining() + 1);
         nu.write(out);
-        ByteBufferUtil.write(out, nextNALUnit);
+        NIOUtils.write(out, nextNALUnit);
         out.flip();
         return out;
     }

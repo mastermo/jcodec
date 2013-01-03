@@ -1,6 +1,5 @@
 package org.jcodec.common;
 
-
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -13,10 +12,6 @@ import org.jcodec.codecs.pcm.PCMDecoder;
 import org.jcodec.codecs.ppm.PPMEncoder;
 import org.jcodec.codecs.prores.ProresDecoder;
 import org.jcodec.codecs.s302.S302MDecoder;
-import org.jcodec.common.io.BufferedRAInputStream;
-import org.jcodec.common.io.FileRAInputStream;
-import org.jcodec.common.io.MappedRAInputStream;
-import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 import org.jcodec.containers.mp4.MP4Demuxer;
@@ -43,7 +38,7 @@ public class JCodecUtil {
     }
 
     public static Format detectFormat(File f) throws IOException {
-        return detectFormat(ByteBufferUtil.fetchFrom(f, 200 * 1024));
+        return detectFormat(NIOUtils.fetchFrom(f, 200 * 1024));
     }
 
     public static Format detectFormat(ByteBuffer b) {
@@ -90,14 +85,6 @@ public class JCodecUtil {
             return null;
     }
 
-    public static RAInputStream bufin(File f) throws IOException {
-        return new BufferedRAInputStream(new FileRAInputStream(f));
-    }
-
-    public static RAInputStream mapin(File f) throws IOException {
-        return new MappedRAInputStream(new FileRAInputStream(f), 16, 20);
-    }
-
     public static void savePicture(Picture pic, String format, File file) throws IOException {
         Transform transform = ColorUtil.getTransform(pic.getColor(), ColorSpace.RGB);
         Picture rgb = Picture.create(pic.getWidth(), pic.getHeight(), ColorSpace.RGB);
@@ -110,6 +97,31 @@ public class JCodecUtil {
         Transform transform = ColorUtil.getTransform(pic.getColor(), ColorSpace.RGB);
         Picture rgb = Picture.create(pic.getWidth(), pic.getHeight(), ColorSpace.RGB);
         transform.transform(pic, rgb);
-        new PPMEncoder().encodeFrame(rgb).writeTo(file);
+        NIOUtils.writeTo(new PPMEncoder().encodeFrame(rgb), file);
+    }
+
+    public static byte[] asciiString(String fourcc) {
+        char[] ch = fourcc.toCharArray();
+        byte[] result = new byte[ch.length];
+        for (int i = 0; i < ch.length; i++) {
+            result[i] = (byte) ch[i];
+        }
+        return result;
+    }
+
+    public static void writeBER32(ByteBuffer buffer, int value) {
+        buffer.put((byte) ((value >> 21) | 0x80));
+        buffer.put((byte) ((value >> 14) | 0x80));
+        buffer.put((byte) ((value >> 7) | 0x80));
+        buffer.put((byte) (value & 0x7F));
+    }
+
+    public static int readBER32(ByteBuffer input) {
+        int size = 0;
+        size |= (input.get() & 0x7f) << 21;
+        size |= (input.get() & 0x7f) << 14;
+        size |= (input.get() & 0x7f) << 7;
+        size |= input.get() & 0x7f;
+        return size;
     }
 }

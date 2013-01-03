@@ -6,15 +6,12 @@ import gnu.trove.list.array.TIntArrayList;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.jcodec.common.ByteBufferUtil;
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.io.RAInputStream;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.RationalLarge;
 import org.jcodec.common.model.TapeTimecode;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
@@ -53,7 +50,7 @@ public class MP4Demuxer {
 
     private List<DemuxerTrack> tracks;
     private TimecodeTrack timecodeTrack;
-    private RAInputStream input;
+    private FileChannel input;
     private MovieBox movie;
 
     public abstract class DemuxerTrack {
@@ -315,7 +312,6 @@ public class MP4Demuxer {
             if (tgtLen > result.remaining()) {
                 throw new IllegalArgumentException("Insufficient room to fit " + n + " samples");
             }
-            ReadableByteChannel ch = Channels.newChannel(input);
 
             int se = sampleToChunks[stscInd].getEntry();
             do {
@@ -323,8 +319,8 @@ public class MP4Demuxer {
                 int toRead = (int) Math.min(result.remaining(), chSize - posShift);
                 int read;
                 synchronized (input) {
-                    input.seek(chunkOffsets[stcoInd] + posShift);
-                    read = ByteBufferUtil.read(ch, result, toRead);
+                    input.position(chunkOffsets[stcoInd] + posShift);
+                    read = NIOUtils.read(input, result, toRead);
                 }
                 if (read == -1)
                     break;
@@ -462,9 +458,10 @@ public class MP4Demuxer {
                     if (stscInd < sampleToChunks.length - 1 && chunkNo + 1 >= sampleToChunks[stscInd + 1].getFirst())
                         stscInd++;
                     long offset = chunkOffsets[chunkNo];
-                    input.seek(offset);
+                    input.position(offset);
+                    ByteBuffer buf = NIOUtils.fetchFrom(input, nSamples * 4);
                     for (int i = 0; i < nSamples; i++) {
-                        ss.add((input.read() << 24) | (input.read() << 16) | (input.read() << 8) | input.read());
+                        ss.add(buf.getInt());
                     }
                 }
                 samples = ss.toArray();
@@ -538,11 +535,10 @@ public class MP4Demuxer {
             }
             ByteBuffer result = _result.duplicate();
             result.limit(size);
-            ReadableByteChannel ch = Channels.newChannel(input);
 
             synchronized (input) {
-                input.seek(chunkOffsets[stcoInd] + offInChunk);
-                if (ByteBufferUtil.read(ch, result) < size)
+                input.position(chunkOffsets[stcoInd] + offInChunk);
+                if (NIOUtils.read(input, result) < size)
                     return null;
             }
 
@@ -618,7 +614,7 @@ public class MP4Demuxer {
         }
     };
 
-    public MP4Demuxer(RAInputStream input) throws IOException {
+    public MP4Demuxer(FileChannel input) throws IOException {
         this.input = input;
         tracks = new LinkedList<DemuxerTrack>();
         findMovieBox(input);
@@ -628,7 +624,7 @@ public class MP4Demuxer {
         return tracks.toArray(new DemuxerTrack[] {});
     }
 
-    private void findMovieBox(RAInputStream input) throws IOException {
+    private void findMovieBox(FileChannel input) throws IOException {
         movie = MP4Util.parseMovie(input);
         if (movie == null)
             throw new IOException("Could not find movie meta information box");
@@ -714,7 +710,7 @@ public class MP4Demuxer {
             total++;
             if (len >= Integer.MAX_VALUE)
                 break;
-            ByteBufferUtil.skip(fork, (int) (len - hdrLen));
+            NIOUtils.skip(fork, (int) (len - hdrLen));
         }
 
         return success * 100 / total;

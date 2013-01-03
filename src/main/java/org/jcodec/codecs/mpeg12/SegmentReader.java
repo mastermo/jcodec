@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -31,7 +31,7 @@ public class SegmentReader {
     public SegmentReader(ReadableByteChannel channel, int fetchSize) throws IOException {
         this.channel = channel;
         this.fetchSize = fetchSize;
-        buf = ByteBufferUtil.fetchFrom(channel, 4);
+        buf = NIOUtils.fetchFrom(channel, 4);
         pos = buf.remaining();
         curMarker = buf.getInt();
     }
@@ -51,7 +51,7 @@ public class SegmentReader {
                 out.put((byte) (curMarker >>> 24));
                 curMarker = (curMarker << 8) | (buf.get() & 0xff);
             }
-            buf = ByteBufferUtil.fetchFrom(channel, fetchSize);
+            buf = NIOUtils.fetchFrom(channel, fetchSize);
             pos += buf.remaining();
         } while (buf.hasRemaining());
         out.putInt(curMarker);
@@ -70,7 +70,7 @@ public class SegmentReader {
                 }
                 curMarker = (curMarker << 8) | (buf.get() & 0xff);
             }
-            buf = ByteBufferUtil.fetchFrom(channel, fetchSize);
+            buf = NIOUtils.fetchFrom(channel, fetchSize);
             pos += buf.remaining();
         } while (buf.hasRemaining());
         done = true;
@@ -88,7 +88,7 @@ public class SegmentReader {
                 out.put((byte) (curMarker >>> 24));
                 curMarker = (curMarker << 8) | (buf.get() & 0xff);
             }
-            buf = ByteBufferUtil.fetchFrom(channel, fetchSize);
+            buf = NIOUtils.fetchFrom(channel, fetchSize);
             pos += buf.remaining();
         } while (buf.hasRemaining());
         out.putInt(curMarker);

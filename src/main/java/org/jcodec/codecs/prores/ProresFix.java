@@ -19,7 +19,7 @@ import java.util.List;
 
 import org.jcodec.codecs.prores.ProresConsts.FrameHeader;
 import org.jcodec.codecs.prores.ProresConsts.PictureHeader;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.BitWriter;
 
@@ -253,7 +253,7 @@ public class ProresFix {
                 sliceMbCount >>= 1;
 
             try {
-                checkSlice(ByteBufferUtil.sub(data, ph.sliceSizes[i]), sliceMbCount);
+                checkSlice(NIOUtils.read(data, ph.sliceSizes[i]), sliceMbCount);
             } catch (Exception e) {
                 messages.add("[ERROR] Slice data corrupt: mbX = " + mbX + ", mbY = " + mbY + ". " + e.getMessage());
             }

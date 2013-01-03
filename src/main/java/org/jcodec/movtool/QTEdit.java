@@ -2,13 +2,12 @@ package org.jcodec.movtool;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.jcodec.common.io.RAInputStream;
 import org.jcodec.containers.mp4.MP4Util;
-import org.jcodec.containers.mp4.boxes.Box;
 import org.jcodec.containers.mp4.boxes.MovieBox;
 
 /**
@@ -36,11 +35,11 @@ public class QTEdit {
          * 
          * @param movie
          */
-        void apply(MovieBox movie, RAInputStream[][] refs) throws IOException;
+        void apply(MovieBox movie, FileChannel[][] refs) throws IOException;
     }
 
     public static abstract class BaseCommand implements Command {
-        public void apply(MovieBox movie, RAInputStream[][] refs) {
+        public void apply(MovieBox movie, FileChannel[][] refs) {
             apply(movie);
         }
 
@@ -89,13 +88,13 @@ public class QTEdit {
 
         MovieBox movie = MP4Util.createRefMovie(input);
 
-        final RAInputStream[][] inputs = new Flattern().getInputs(movie);
+        final FileChannel[][] inputs = new Flattern().getInputs(movie);
 
         applyCommands(movie, inputs, commands);
 
         File out = new File(input.getParentFile(), "." + input.getName());
         new Flattern() {
-            protected RAInputStream[][] getInputs(MovieBox movie) throws IOException {
+            protected FileChannel[][] getInputs(MovieBox movie) throws IOException {
                 return inputs;
             }
         }.flattern(movie, out);
@@ -103,7 +102,7 @@ public class QTEdit {
         out.renameTo(input);
     }
 
-    private static void applyCommands(MovieBox mov, RAInputStream[][] refs, List<Command> commands) throws IOException {
+    private static void applyCommands(MovieBox mov, FileChannel[][] refs, List<Command> commands) throws IOException {
         for (Command command : commands) {
             command.apply(mov, refs);
         }

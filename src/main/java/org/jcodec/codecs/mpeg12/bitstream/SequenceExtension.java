@@ -1,10 +1,7 @@
 package org.jcodec.codecs.mpeg12.bitstream;
 
-import java.io.IOException;
-
 import org.jcodec.common.io.BitReader;
-import org.jcodec.common.io.InBits;
-import org.jcodec.common.io.OutBits;
+import org.jcodec.common.io.BitWriter;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -46,7 +43,7 @@ public class SequenceExtension {
         return se;
     }
 
-    public void write(OutBits out) throws IOException {
+    public void write(BitWriter out) {
         out.writeNBit(profile_and_level, 8);
         out.write1Bit(progressive_sequence);
         out.writeNBit(chroma_format, 2);

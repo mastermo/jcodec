@@ -6,7 +6,7 @@ import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.junit.Test;
 
 public class TestPPS extends TestCase {
@@ -35,7 +35,7 @@ public class TestPPS extends TestCase {
     @Test
     public void testRead() throws Exception {
 
-        ByteBuffer bb = ByteBufferUtil.fetchFrom(new File("src/test/resources/h264/pps/pps.dat"));
+        ByteBuffer bb = NIOUtils.fetchFrom(new File("src/test/resources/h264/pps/pps.dat"));
         PictureParameterSet pps = PictureParameterSet.read(bb);
         assertEquals(expected, pps);
     }

@@ -2,7 +2,7 @@ package org.jcodec.codecs.h264;
 
 import static org.jcodec.codecs.h264.io.model.NALUnitType.IDR_SLICE;
 import static org.jcodec.codecs.h264.io.model.NALUnitType.NON_IDR_SLICE;
-import static org.jcodec.common.ByteBufferUtil.map;
+import static org.jcodec.common.NIOUtils.map;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,7 +37,7 @@ import org.jcodec.codecs.h264.io.read.CAVLCReader;
 import org.jcodec.codecs.h264.io.read.SliceDataReader;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.codecs.util.PGMIO;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;

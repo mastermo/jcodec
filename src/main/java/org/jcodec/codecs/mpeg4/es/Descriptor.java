@@ -1,12 +1,9 @@
 package org.jcodec.codecs.mpeg4.es;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutput;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.nio.ByteBuffer;
 
-import org.jcodec.common.io.WindowInputStream;
+import org.jcodec.common.NIOUtils;
+import org.jcodec.common.JCodecUtil;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -29,44 +26,36 @@ public abstract class Descriptor {
         this.size = size;
     }
 
-    public void write(DataOutput out) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream daos = new DataOutputStream(baos);
-        doWrite(daos);
-        byte[] b = baos.toByteArray();
+    public void write(ByteBuffer out) {
+        ByteBuffer fork = out.duplicate();
+        NIOUtils.skip(out, 5);
+        doWrite(out);
 
-        out.write(tag);
-        out.write(((b.length >> 21) | 0x80) & 0xff);
-        out.write(((b.length >> 14) | 0x80) & 0xff);
-        out.write(((b.length >> 7) | 0x80) & 0xff);
-        out.write(b.length & 0x7F);
-        out.write(b);
+        int length = out.position() - fork.position() - 5;
+        fork.put((byte) tag);
+        JCodecUtil.writeBER32(fork, length);
     }
 
-    protected abstract void doWrite(DataOutput out) throws IOException;
+    protected abstract void doWrite(ByteBuffer out);
 
-    public static Descriptor read(InputStream input) throws IOException {
-        int tag = input.read();
+    public static Descriptor read(ByteBuffer input) {
+        int tag = input.get() & 0xff;
         if (tag == -1)
             return null;
-        long size = 0;
-        size |= (input.read() << 21) & 0x7f;
-        size |= (input.read() << 14) & 0x7f;
-        size |= (input.read() << 7) & 0x7f;
-        size |= (input.read()) & 0x7f;
+        int size = JCodecUtil.readBER32(input);
 
         Class<? extends Descriptor> cls = factory.byTag(tag);
         Descriptor descriptor;
         try {
             descriptor = cls.getConstructor(Integer.TYPE, Integer.TYPE).newInstance(tag, (int) size);
         } catch (Exception e) {
-            throw new IOException(e);
+            throw new RuntimeException(e);
         }
-        descriptor.parse(new WindowInputStream(input, size));
+        descriptor.parse(NIOUtils.read(input, size));
         return descriptor;
     }
 
-    protected abstract void parse(InputStream input) throws IOException;
+    protected abstract void parse(ByteBuffer input);
 
     public static <T> T find(Descriptor es, Class<T> class1, int tag) {
         if (es.getTag() == tag)

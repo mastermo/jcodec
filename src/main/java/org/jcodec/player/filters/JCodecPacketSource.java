@@ -1,14 +1,13 @@
 package org.jcodec.player.filters;
 
-import static org.jcodec.common.JCodecUtil.bufin;
-
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jcodec.common.io.RAInputStream;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.RationalLarge;
 import org.jcodec.common.model.Size;
@@ -29,10 +28,10 @@ public class JCodecPacketSource {
 
     private MP4Demuxer demuxer;
     private List<Track> tracks;
-    private RAInputStream is;
+    private FileChannel is;
 
     public JCodecPacketSource(File file) throws IOException {
-        is = bufin(file);
+        is = new FileInputStream(file).getChannel();
         demuxer = new MP4Demuxer(is);
 
         tracks = new ArrayList<Track>();

@@ -15,7 +15,7 @@ import java.nio.ByteBuffer;
 
 import org.jcodec.codecs.prores.ProresConsts.FrameHeader;
 import org.jcodec.codecs.prores.ProresConsts.PictureHeader;
-import org.jcodec.common.ByteBufferUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.VideoDecoder;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.ColorSpace;
@@ -366,7 +366,7 @@ public class ProresDecoder implements VideoDecoder {
     }
 
     static final BitReader bitstream(ByteBuffer data, int dataSize) {
-        return new BitReader(ByteBufferUtil.sub(data, dataSize));
+        return new BitReader(NIOUtils.read(data, dataSize));
     }
 
     static final int clip(int val, int min, int max) {
