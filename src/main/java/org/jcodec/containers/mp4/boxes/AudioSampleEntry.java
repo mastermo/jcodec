@@ -87,7 +87,8 @@ public class AudioSampleEntry extends SampleEntry {
         compressionId = input.getShort();
         pktSize = input.getShort();
 
-        sampleRate = (float) input.getInt() / 65536f;
+        long sr = input.getInt() & 0xffffffffL;
+        sampleRate = (float) sr / 65536f;
 
         if (version == 1) {
             samplesPerPkt = input.getInt();
@@ -121,10 +122,10 @@ public class AudioSampleEntry extends SampleEntry {
         if (version == 0)
             out.putShort(sampleSize);
         else
-            out.putShort((short)16);
+            out.putShort((short) 16);
 
-        out.putShort((short)compressionId);
-        out.putShort((short)pktSize);
+        out.putShort((short) compressionId);
+        out.putShort((short) pktSize);
 
         out.putInt((int) Math.round(sampleRate * 65536d));
 

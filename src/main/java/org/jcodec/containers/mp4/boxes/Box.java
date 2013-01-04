@@ -83,7 +83,7 @@ public abstract class Box {
         NIOUtils.skip(buf, 8);
         doWrite(buf);
 
-        header.setBodySize(buf.position() - dup.position());
+        header.setBodySize(buf.position() - dup.position() - 8);
         Assert.assertEquals(header.headerSize(), 8);
         header.write(dup);
     }

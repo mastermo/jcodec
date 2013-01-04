@@ -18,6 +18,7 @@ import javax.sound.sampled.AudioFormat;
 
 import junit.framework.Assert;
 
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
@@ -773,7 +774,7 @@ public class MP4Muxer {
         MP4Util.writeMovie(out, movie);
 
         out.position(mdatOffset);
-        out.write(ByteBuffer.allocate(8).putLong(mdatSize));
+        out.write((ByteBuffer)ByteBuffer.allocate(8).putLong(mdatSize).flip());
     }
 
     private void mediaHeader(MediaInfoBox minf, TrackType type) {

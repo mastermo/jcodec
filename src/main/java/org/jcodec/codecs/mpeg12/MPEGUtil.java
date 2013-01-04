@@ -44,11 +44,10 @@ public class MPEGUtil {
 
         int val = 0xffffffff;
         while (buf.hasRemaining()) {
-            val <<= 8;
-            val |= buf.get();
+            val = (val << 8) | (buf.get() & 0xff);
             if (val >= mmin && val <= mmax) {
                 if (n == 0) {
-                    buf.position(buf.position() - 3);
+                    buf.position(buf.position() - 4);
                     result.limit(buf.position() - from);
                     break;
                 }

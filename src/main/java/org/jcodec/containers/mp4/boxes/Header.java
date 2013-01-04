@@ -46,8 +46,6 @@ public class Header {
 
     public static Header read(ByteBuffer input) {
         long size = input.getInt();
-        if (size < 1)
-            return null;
         size &= 0xffffffffL;
         String fourcc = NIOUtils.readString(input, 4);
         boolean lng = false;

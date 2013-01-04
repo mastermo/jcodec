@@ -36,8 +36,7 @@ public class MP4Util {
     }
 
     public static MovieBox parseMovie(FileChannel input) throws IOException {
-        List<Atom> rootAtoms = getRootAtoms(input);
-        for (Atom atom : rootAtoms) {
+        for (Atom atom : getRootAtoms(input)) {
             if ("moov".equals(atom.getHeader().getFourcc())) {
                 return (MovieBox) atom.parseBox(input);
             }
@@ -50,14 +49,12 @@ public class MP4Util {
         List<Atom> result = new ArrayList<Atom>();
         long off = 0;
         Header atom;
-        do {
+        while(off < input.size()) {
+            input.position(off);
             atom = Header.read(NIOUtils.fetchFrom(input, 16));
-            if (atom == null)
-                break;
             result.add(new Atom(atom, off));
             off += atom.getSize();
-            input.position(off);
-        } while (true);
+        }
 
         return result;
     }

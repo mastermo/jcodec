@@ -37,17 +37,12 @@ public class NodeBox extends Box {
 
     public void parse(ByteBuffer input) {
 
-        Box box;
-        while ((box = parseChildBox(input, factory)) != null)
-            boxes.add(box);
+        while (input.remaining() >= 8)
+            boxes.add(parseChildBox(input, factory));
     }
 
     protected static Box parseChildBox(ByteBuffer input, BoxFactory factory) {
         Header childAtom = Header.read(input);
-
-        if (childAtom == null)
-            return null;
-
         return parseBox(NIOUtils.read(input, (int) childAtom.getBodySize()), childAtom, factory);
     }
 

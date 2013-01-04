@@ -26,6 +26,7 @@ import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
+import org.jcodec.containers.mp4.Brand;
 import org.jcodec.containers.mp4.MP4Demuxer;
 import org.jcodec.containers.mp4.MP4Demuxer.FramesTrack;
 import org.jcodec.containers.mp4.MP4DemuxerException;
@@ -60,6 +61,8 @@ public class TranscodeMain {
         }
         if ("prores2png".equals(args[0]))
             prores2png(args[1], args[2]);
+        if ("mpeg2png".equals(args[0]))
+            mpeg2png(args[1], args[2]);
         else if ("png2prores".equals(args[0]))
             png2prores(args[1], args[2], args.length > 3 ? args[3] : "apch");
         else if ("y4m2prores".equals(args[0]))
@@ -109,7 +112,40 @@ public class TranscodeMain {
 
     }
 
-    private static void prores2png(String in, String out) throws IOException, MP4DemuxerException {
+    private static void prores2png(String in, String out) throws IOException {
+        File file = new File(in);
+        if (!file.exists()) {
+            System.out.println("Input file doesn't exist");
+            return;
+        }
+
+        MP4Demuxer rawDemuxer = new MP4Demuxer(new FileInputStream(file).getChannel());
+        FramesTrack videoTrack = (FramesTrack) rawDemuxer.getVideoTrack();
+        if (videoTrack == null) {
+            System.out.println("Video track not found");
+            return;
+        }
+        Yuv422pToRgb transform = new Yuv422pToRgb(2, 0);
+
+        ProresDecoder decoder = new ProresDecoder();
+        BufferedImage bi = null;
+        Picture rgb = null;
+        int i = 0;
+        Packet pkt;
+        while ((pkt = videoTrack.getFrames(1)) != null) {
+            Picture buf = Picture.create(1920, 1080, ColorSpace.YUV422_10);
+            Picture pic = decoder.decodeFrame(pkt.getData(), buf.getData());
+            if (bi == null)
+                bi = new BufferedImage(pic.getWidth(), pic.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
+            if (rgb == null)
+                rgb = Picture.create(pic.getWidth(), pic.getHeight(), RGB);
+            transform.transform(pic, rgb);
+            AWTUtil.toBufferedImage(rgb, bi);
+            ImageIO.write(bi, "png", new File(format(out, i++)));
+        }
+    }
+    
+    private static void mpeg2png(String in, String out) throws IOException {
         File file = new File(in);
         if (!file.exists()) {
             System.out.println("Input file doesn't exist");
@@ -153,12 +189,10 @@ public class TranscodeMain {
         FileChannel sink = null;
         try {
             sink = new FileOutputStream(new File(out)).getChannel();
-            MP4Muxer muxer = new MP4Muxer(sink);
+            MP4Muxer muxer = new MP4Muxer(sink, Brand.MOV);
             ProresEncoder encoder = new ProresEncoder(profile);
             RgbToYuv422 transform = new RgbToYuv422(2, 0);
-            Picture yuv = null;
 
-            ByteBuffer buf = null;
             CompressedTrack videoTrack = null;
             int i;
             for (i = 1;; i++) {
@@ -172,11 +206,9 @@ public class TranscodeMain {
                             APPLE_PRO_RES_422, 24000);
                     videoTrack.setTgtChunkDuration(HALF, SEC);
                 }
-                if (yuv == null)
-                    yuv = Picture.create(rgb.getWidth(), rgb.getHeight(), YUV420);
-                if (buf == null)
-                    buf = ByteBuffer.allocate(rgb.getWidth() * rgb.getHeight() * 6);
+                Picture yuv = Picture.create(rgb.getWidth(), rgb.getHeight(), ColorSpace.YUV422);
                 transform.transform(AWTUtil.fromBufferedImage(rgb), yuv);
+                ByteBuffer buf = ByteBuffer.allocate(rgb.getWidth() * rgb.getHeight() * 3);
 
                 ByteBuffer ff = encoder.encodeFrame(buf, yuv);
                 videoTrack.addFrame(new MP4Packet(ff, i * 1001, 24000, 1001, i, true, null, i * 1001, 0));

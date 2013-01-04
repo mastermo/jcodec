@@ -21,6 +21,7 @@ import static org.jcodec.common.tools.MathUtil.log2;
 
 import java.nio.ByteBuffer;
 
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitWriter;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.model.Rect;
@@ -203,9 +204,8 @@ public class ProresEncoder {
         int qp = prevQp;
 
         out.put((byte) (6 << 3)); // hdr size
-        out.put((byte) qp); // qscale
         ByteBuffer fork = out.duplicate();
-        out.putInt(0);
+        NIOUtils.skip(out, 5);
         int rem = out.position();
         int[] sizes = new int[3];
         encodeSliceData(out, scaledLuma[qp - 1], scaledChroma[qp - 1], scan, sliceMbCount, striped, qp, sizes);
@@ -223,6 +223,7 @@ public class ProresEncoder {
             } while (bits(sizes) < low && qp > profile.firstQp);
         }
 
+        fork.put((byte) qp);
         fork.putShort((short) sizes[0]);
         fork.putShort((short) sizes[1]);
 
@@ -258,8 +259,10 @@ public class ProresEncoder {
         int nSlices = calcNSlices(mbWidth, mbHeight);
         writePictureHeader(LOG_DEFAULT_SLICE_MB_WIDTH, nSlices, out);
         ByteBuffer fork = out.duplicate();
-        out.position(out.position() + (nSlices << 1));
+        NIOUtils.skip(out, nSlices << 1);
 
+        int i = 0;
+        int[] total =  new int[nSlices];
         for (int mbY = 0; mbY < mbHeight; mbY++) {
             int mbX = 0;
             int sliceMbCount = DEFAULT_SLICE_MB_WIDTH;
@@ -273,6 +276,7 @@ public class ProresEncoder {
                 qp = encodeSlice(out, scaledLuma, scaledChroma, scan, sliceMbCount, mbX, mbY, picture, qp, mbWidth,
                         mbHeight, unsafeBottom || unsafeRight);
                 fork.putShort((short) (out.position() - sliceStart));
+                total[i++] = (short) (out.position() - sliceStart);
 
                 mbX += sliceMbCount;
             }
@@ -346,7 +350,7 @@ public class ProresEncoder {
     }
 
     public ByteBuffer encodeFrame(ByteBuffer _out, Picture... pics) {
-        ByteBuffer out = _out.slice();
+        ByteBuffer out = _out.duplicate();
         ByteBuffer fork = out.duplicate();
 
         int[] scan = pics.length > 1 ? interlaced_scan : progressive_scan;
