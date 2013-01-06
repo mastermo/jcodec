@@ -5,9 +5,9 @@ import org.jcodec.codecs.h264.decode.model.DecodedChroma;
 import org.jcodec.codecs.h264.decode.model.MVMatrix;
 import org.jcodec.codecs.h264.decode.model.NearbyPixels;
 import org.jcodec.codecs.h264.decode.model.PixelBuffer;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
+import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.model.Point;
 
@@ -31,7 +31,7 @@ public class ChromaDecoder {
 
     private int[] chromaQpOffset;
 
-    public ChromaDecoder(int[] chromaQpOffset, int bitDepthChroma, ChromaFormat chromaFormat) {
+    public ChromaDecoder(int[] chromaQpOffset, int bitDepthChroma, ColorSpace chromaFormat) {
         transform = new CoeffTransformer(null);
         intraPredictionBuilder = new ChromaIntraPredictionBuilder(bitDepthChroma, chromaFormat);
         interPredictionBuilder = new ChromaInterPredictionBuilder();

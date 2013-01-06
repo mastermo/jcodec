@@ -1,11 +1,12 @@
 package org.jcodec.codecs.h264.decode;
 
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import org.jcodec.codecs.h264.decode.model.BlockBorder;
 import org.jcodec.codecs.h264.decode.model.DecodedChroma;
 import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
 import org.jcodec.codecs.h264.decode.model.NearbyPixels;
 import org.jcodec.codecs.h264.decode.model.PixelBuffer;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 
@@ -28,7 +29,7 @@ public class MBlockDecoderI16x16 {
     public MBlockDecoderI16x16(int[] chromaQpOffset, int bitDepthLuma, int bitDepthChroma) {
         transform = new CoeffTransformer(null);
         intraPredictionBuilder = new Intra16x16PredictionBuilder(bitDepthLuma);
-        chromaDecoder = new ChromaDecoder(chromaQpOffset, bitDepthChroma, ChromaFormat.YUV_420);
+        chromaDecoder = new ChromaDecoder(chromaQpOffset, bitDepthChroma, YUV420);
     }
 
     public DecodedMBlock decodeI16x16(MBlockIntra16x16 coded, int qp, NearbyPixels nearPixels) {

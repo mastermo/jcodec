@@ -13,7 +13,7 @@ package org.jcodec.codecs.h264.io.model;
 public abstract class MBlockWithResidual extends CodedMacroblock {
     private ResidualBlock[] luma;
 
-    public MBlockWithResidual(int qpDelta, CodedChroma chroma, CoeffToken[] lumaTokens, ResidualBlock[] luma) {
+    public MBlockWithResidual(int qpDelta, CodedChroma chroma, int[] lumaTokens, ResidualBlock[] luma) {
         super(qpDelta, chroma, lumaTokens);
         this.luma = luma;
     }

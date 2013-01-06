@@ -6,6 +6,7 @@ import static org.jcodec.player.filters.http.MediaInfoParser.parseMediaInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -162,7 +163,7 @@ public class Downloader {
         try {
             in = entity.getContent();
             ByteBuffer fork = bfr.duplicate();
-            NIOUtils.fetch(fork, in);
+            NIOUtils.read(Channels.newChannel(in), fork);
             fork.flip();
             return fork;
         } finally {

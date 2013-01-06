@@ -774,7 +774,7 @@ public class MP4Muxer {
         MP4Util.writeMovie(out, movie);
 
         out.position(mdatOffset);
-        out.write((ByteBuffer)ByteBuffer.allocate(8).putLong(mdatSize).flip());
+        NIOUtils.writeLong(out, mdatSize);
     }
 
     private void mediaHeader(MediaInfoBox minf, TrackType type) {

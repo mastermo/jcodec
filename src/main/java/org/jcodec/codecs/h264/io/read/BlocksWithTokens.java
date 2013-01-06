@@ -1,6 +1,5 @@
 package org.jcodec.codecs.h264.io.read;
 
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 
 /**
@@ -12,9 +11,9 @@ import org.jcodec.codecs.h264.io.model.ResidualBlock;
  */
 class BlocksWithTokens {
     private ResidualBlock[] block;
-    private CoeffToken[] token;
+    private int[] token;
 
-    public BlocksWithTokens(ResidualBlock[] block, CoeffToken[] token) {
+    public BlocksWithTokens(ResidualBlock[] block, int[] token) {
         this.block = block;
         this.token = token;
     }
@@ -27,11 +26,11 @@ class BlocksWithTokens {
         this.block = block;
     }
 
-    public CoeffToken[] getToken() {
+    public int[] getToken() {
         return token;
     }
 
-    public void setToken(CoeffToken[] token) {
+    public void setToken(int[] token) {
         this.token = token;
     }
 

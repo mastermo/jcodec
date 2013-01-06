@@ -21,7 +21,7 @@ public class MBlockInter8x8 extends MBlockWithResidual {
         this.prediction = prediction;
     }
 
-    public MBlockInter8x8(int qpDelta, CodedChroma chroma, CoeffToken[] lumaTokens, ResidualBlock[] luma,
+    public MBlockInter8x8(int qpDelta, CodedChroma chroma, int[] lumaTokens, ResidualBlock[] luma,
             Inter8x8Prediction prediction) {
         super(qpDelta, chroma, lumaTokens, luma);
         this.prediction = prediction;

@@ -3,6 +3,7 @@ package org.jcodec.samples.streaming;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.channels.Channels;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.jetty.util.MultiPartOutputStream;
-import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.TapeTimecode;
 import org.jcodec.player.filters.MediaInfo;
@@ -150,7 +150,7 @@ public class StreamingServlet extends HttpServlet {
 
         out.startPart("application/octet-stream", headers.toArray(new String[0]));
 
-        NIOUtils.writeTo(packet.getData(), out);
+        Channels.newChannel(out).write(packet.getData());
     }
 
     private void outGOPs(HttpServletResponse resp, VideoAdapterTrack track, int frameS, int frameE) throws IOException {
@@ -176,7 +176,7 @@ public class StreamingServlet extends HttpServlet {
 
     private int nextGop(VideoAdapterTrack track, int frameS) {
         int curGop = track.gopId(frameS);
-        if(curGop == -1)
+        if (curGop == -1)
             return -1;
         while (curGop == track.gopId(frameS))
             frameS++;
@@ -199,7 +199,7 @@ public class StreamingServlet extends HttpServlet {
 
             out.startPart("application/octet-stream", headers.toArray(new String[0]));
 
-            NIOUtils.writeTo(packet.getData(), out);
+            Channels.newChannel(out).write(packet.getData());
         }
     }
 

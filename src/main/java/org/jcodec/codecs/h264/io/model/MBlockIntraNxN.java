@@ -19,7 +19,7 @@ public class MBlockIntraNxN extends MBlockWithResidual {
         this.prediction = prediction;
     }
 
-    public MBlockIntraNxN(int qpDelta, CodedChroma chroma, CoeffToken[] lumaTokens, ResidualBlock[] luma,
+    public MBlockIntraNxN(int qpDelta, CodedChroma chroma, int[] lumaTokens, ResidualBlock[] luma,
             IntraNxNPrediction prediction) {
         super(qpDelta, chroma, lumaTokens, luma);
         this.prediction = prediction;

@@ -3,10 +3,11 @@ package org.jcodec.codecs.h264.io.read;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
+import static org.jcodec.common.model.ColorSpace.MONO;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
+import org.jcodec.codecs.h264.H264Const;
+import org.jcodec.codecs.h264.io.CAVLC;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.IntraNxNPrediction;
 import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
 import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
@@ -14,6 +15,8 @@ import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.MBlockWithResidual;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.io.VLC;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -26,10 +29,9 @@ import org.jcodec.common.io.BitReader;
  */
 public class IntraMBlockReader extends CodedMblockReader {
     private boolean transform8x8;
-    private ChromaFormat chromaFormat;
+    private ColorSpace chromaFormat;
 
-    private ResidualCoeffsCAVLCReader cavlcReader;
-    private CoeffTokenReader coeffTokenReader;
+    private CAVLC cavlcReader;
     private ChromaReader chromaReader;
 
     private static int[] coded_block_pattern_intra_color = new int[] { 47, 31, 15, 0, 23, 27, 29, 30, 7, 11, 13, 14,
@@ -39,18 +41,17 @@ public class IntraMBlockReader extends CodedMblockReader {
     private static int[] coded_block_pattern_intra_monochrome = new int[] { 15, 0, 7, 11, 13, 14, 3, 5, 10, 12, 1, 2,
             4, 8, 6, 9 };
 
-    public IntraMBlockReader(boolean transform8x8, ChromaFormat chromaFormat, boolean entropyCoding) {
+    public IntraMBlockReader(boolean transform8x8, ColorSpace chromaFormat, boolean entropyCoding) {
         super(chromaFormat, entropyCoding);
 
         this.transform8x8 = transform8x8;
         this.chromaFormat = chromaFormat;
 
-        coeffTokenReader = new CoeffTokenReader(chromaFormat);
-        cavlcReader = new ResidualCoeffsCAVLCReader(chromaFormat);
+        cavlcReader = new CAVLC(chromaFormat);
         chromaReader = new ChromaReader(chromaFormat, entropyCoding);
     }
 
-    public MBlockIntraNxN readMBlockIntraNxN(BitReader reader, MBlockNeighbourhood neighbourhood)  {
+    public MBlockIntraNxN readMBlockIntraNxN(BitReader reader, MBlockNeighbourhood neighbourhood) {
         boolean transform8x8Used = false;
         if (transform8x8) {
             transform8x8Used = readBool(reader, "transform_size_8x8_flag");
@@ -72,11 +73,11 @@ public class IntraMBlockReader extends CodedMblockReader {
     }
 
     public MBlockIntra16x16 readMBlockIntra16x16(BitReader reader, MBlockNeighbourhood neighbourhood,
-            int lumaPredictionMode, int codedBlockPatternChroma, int codedBlockPatternLuma)  {
+            int lumaPredictionMode, int codedBlockPatternChroma, int codedBlockPatternLuma) {
 
-        CoeffToken[] pred = new CoeffToken[24];
-        CoeffToken[] lumaLeft = neighbourhood.getLumaLeft();
-        CoeffToken[] lumaTop = neighbourhood.getLumaTop();
+        int[] pred = new int[24];
+        int[] lumaLeft = neighbourhood.getLumaLeft();
+        int[] lumaTop = neighbourhood.getLumaTop();
 
         pred[16] = lumaLeft != null ? lumaLeft[5] : null;
         pred[17] = lumaLeft != null ? lumaLeft[7] : null;
@@ -87,7 +88,14 @@ public class IntraMBlockReader extends CodedMblockReader {
         pred[22] = lumaTop != null ? lumaTop[14] : null;
         pred[23] = lumaTop != null ? lumaTop[15] : null;
 
-        CoeffToken[] tokens = new CoeffToken[16];
+        int[] tokens = new int[16];
+
+        boolean[] leftAvailable = new boolean[] { neighbourhood.isLeftAvailable(), true,
+                neighbourhood.isLeftAvailable(), true, true, true, true, true, neighbourhood.isLeftAvailable(), true,
+                neighbourhood.isLeftAvailable(), true, true, true, true, true };
+        boolean[] topAvailable = new boolean[] { neighbourhood.isLeftAvailable(), neighbourhood.isLeftAvailable(),
+                true, true, neighbourhood.isLeftAvailable(), neighbourhood.isLeftAvailable(), true, true, true, true,
+                true, true, true, true, true, true };
 
         int chromaPredictionMode = readUE(reader, "MBP: intra_chroma_pred_mode");
         int mbQPDelta = 0;
@@ -96,27 +104,27 @@ public class IntraMBlockReader extends CodedMblockReader {
 
         ResidualBlock lumaDC;
         {
-            CoeffToken coeffToken = coeffTokenReader.read(reader, pred[mappingLeft4x4[0]], pred[mappingTop4x4[0]]);
+            VLC coeffToken = cavlcReader.getCoeffTokenVLCForLuma(neighbourhood.isLeftAvailable(),
+                    pred[mappingLeft4x4[0]], neighbourhood.isTopAvailable(), pred[mappingTop4x4[0]]);
 
-            lumaDC = new ResidualBlock(cavlcReader.readCoeffs(reader, ResidualBlock.BlockType.BLOCK_LUMA_16x16_DC,
-                    coeffToken));
+            int[] coeff = new int[16];
+            cavlcReader.readCoeffs(reader, coeffToken, H264Const.totalZeros16, coeff);
+            lumaDC = new ResidualBlock(coeff);
         }
 
         ResidualBlock[] lumaAC = new ResidualBlock[16];
         for (int i8x8 = 0; i8x8 < 4; i8x8++) {
-            for (int i4x4 = 0; i4x4 < 4; i4x4++) {
-                int blkAddr = i8x8 * 4 + i4x4;
-                if ((codedBlockPatternLuma & (1 << i8x8)) > 0) {
-                    CoeffToken coeffToken = coeffTokenReader.read(reader, pred[mappingLeft4x4[blkAddr]],
-                            pred[mappingTop4x4[blkAddr]]);
+            if ((codedBlockPatternLuma & (1 << i8x8)) != 0) {
+                for (int i4x4 = 0; i4x4 < 4; i4x4++) {
+                    int blkAddr = i8x8 * 4 + i4x4;
+                    VLC coeffTokenTable = cavlcReader.getCoeffTokenVLCForLuma(leftAvailable[blkAddr],
+                            pred[mappingLeft4x4[blkAddr]], topAvailable[blkAddr], pred[mappingTop4x4[blkAddr]]);
 
-                    lumaAC[blkAddr] = new ResidualBlock(cavlcReader.readCoeffs(reader,
-                            ResidualBlock.BlockType.BLOCK_LUMA_16x16_AC, coeffToken));
-                    pred[blkAddr] = coeffToken;
-                    tokens[blkAddr] = coeffToken;
-                } else {
-                    pred[blkAddr] = new CoeffToken(0, 0);
-                    tokens[blkAddr] = pred[blkAddr];
+                    int[] coeff = new int[15];
+                    int readCoeffs = cavlcReader.readCoeffs(reader, coeffTokenTable, H264Const.totalZeros16, coeff);
+                    lumaAC[blkAddr] = new ResidualBlock(coeff);
+                    pred[blkAddr] = readCoeffs;
+                    tokens[blkAddr] = readCoeffs;
                 }
             }
         }
@@ -126,13 +134,13 @@ public class IntraMBlockReader extends CodedMblockReader {
         return new MBlockIntra16x16(chroma, mbQPDelta, lumaDC, lumaAC, tokens, lumaPredictionMode, chromaPredictionMode);
     }
 
-    protected int readCodedBlockPattern(BitReader reader)  {
+    protected int readCodedBlockPattern(BitReader reader) {
         int val = readUE(reader, "coded_block_pattern");
         return getCodedBlockPatternMapping()[val];
     }
 
     protected int[] getCodedBlockPatternMapping() {
-        if (chromaFormat == ChromaFormat.MONOCHROME) {
+        if (chromaFormat == MONO) {
             return coded_block_pattern_intra_monochrome;
         } else {
             return coded_block_pattern_intra_color;

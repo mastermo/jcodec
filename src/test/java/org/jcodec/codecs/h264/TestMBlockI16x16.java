@@ -1,15 +1,17 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.codecs.h264.io.CAVLC.coeffToken;
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import java.nio.ByteBuffer;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 import org.jcodec.codecs.h264.io.read.IntraMBlockReader;
 import org.jcodec.codecs.util.BinUtil;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.model.ColorSpace;
 
 public class TestMBlockI16x16 extends JAVCTestCase {
 
@@ -28,36 +30,36 @@ public class TestMBlockI16x16 extends JAVCTestCase {
 
         BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil.binaryStringToBytes(bits)));
 
-        IntraMBlockReader intraMBlockReader = new IntraMBlockReader(false, ChromaFormat.YUV_420, false);
+        IntraMBlockReader intraMBlockReader = new IntraMBlockReader(false, YUV420, false);
 
         // MB 81
-        CoeffToken[] lumaTop = new CoeffToken[] { new CoeffToken(5, 3), new CoeffToken(3, 1), new CoeffToken(8, 2),
-                new CoeffToken(4, 3), new CoeffToken(1, 1), new CoeffToken(2, 1), new CoeffToken(3, 1),
-                new CoeffToken(2, 1), new CoeffToken(8, 3), new CoeffToken(8, 2), new CoeffToken(1, 0),
-                new CoeffToken(7, 3), new CoeffToken(4, 1), new CoeffToken(2, 0), new CoeffToken(11, 3),
-                new CoeffToken(7, 3) };
+        int[] lumaTop = new int[] { coeffToken(5, 3), coeffToken(3, 1), coeffToken(8, 2),
+                coeffToken(4, 3), coeffToken(1, 1), coeffToken(2, 1), coeffToken(3, 1),
+                coeffToken(2, 1), coeffToken(8, 3), coeffToken(8, 2), coeffToken(1, 0),
+                coeffToken(7, 3), coeffToken(4, 1), coeffToken(2, 0), coeffToken(11, 3),
+                coeffToken(7, 3) };
 
-        CoeffToken[] cbTop = new CoeffToken[] { new CoeffToken(1, 1), new CoeffToken(0, 0), new CoeffToken(4, 3),
-                new CoeffToken(2, 2) };
+        int[] cbTop = new int[] { coeffToken(1, 1), coeffToken(0, 0), coeffToken(4, 3),
+                coeffToken(2, 2) };
 
-        CoeffToken[] crTop = new CoeffToken[] { new CoeffToken(3, 2), new CoeffToken(0, 0), new CoeffToken(3, 1),
-                new CoeffToken(2, 2) };
+        int[] crTop = new int[] { coeffToken(3, 2), coeffToken(0, 0), coeffToken(3, 1),
+                coeffToken(2, 2) };
 
         // MB 91
 
-        CoeffToken[] lumaLeft = new CoeffToken[] { new CoeffToken(1, 1), new CoeffToken(4, 2), new CoeffToken(1, 1),
-                new CoeffToken(1, 1),
+        int[] lumaLeft = new int[] { coeffToken(1, 1), coeffToken(4, 2), coeffToken(1, 1),
+                coeffToken(1, 1),
 
-                new CoeffToken(2, 2), new CoeffToken(0, 0), new CoeffToken(4, 2), new CoeffToken(5, 3),
+                coeffToken(2, 2), coeffToken(0, 0), coeffToken(4, 2), coeffToken(5, 3),
 
-                new CoeffToken(2, 1), new CoeffToken(5, 3), new CoeffToken(1, 1), new CoeffToken(2, 1),
+                coeffToken(2, 1), coeffToken(5, 3), coeffToken(1, 1), coeffToken(2, 1),
 
-                new CoeffToken(3, 3), new CoeffToken(3, 2), new CoeffToken(3, 3), new CoeffToken(3, 3) };
+                coeffToken(3, 3), coeffToken(3, 2), coeffToken(3, 3), coeffToken(3, 3) };
 
-        CoeffToken[] cbLeft = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-                new CoeffToken(0, 0) };
-        CoeffToken[] crLeft = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-                new CoeffToken(0, 0) };
+        int[] cbLeft = new int[] { coeffToken(0, 0), coeffToken(0, 0), coeffToken(0, 0),
+                coeffToken(0, 0) };
+        int[] crLeft = new int[] { coeffToken(0, 0), coeffToken(0, 0), coeffToken(0, 0),
+                coeffToken(0, 0) };
 
         MBlockNeighbourhood neighbourhood = new MBlockNeighbourhood(lumaLeft, lumaTop, cbLeft, cbTop, crLeft, crTop,
                 null, null, true, true);
@@ -121,16 +123,16 @@ public class TestMBlockI16x16 extends JAVCTestCase {
 
         BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil.binaryStringToBytes(bits)));
 
-        IntraMBlockReader intraMBlockReader = new IntraMBlockReader(false, ChromaFormat.YUV_420, false);
+        IntraMBlockReader intraMBlockReader = new IntraMBlockReader(false, YUV420, false);
 
-        CoeffToken[] lumaLeft = new CoeffToken[] { null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null };
+//        int[] lumaLeft = new int[] { null, null, null, null, null, null, null, null, null, null, null,
+//                null, null, null, null, null };
+//
+//        int[] cbLeft = new int[] { null, null, null, null };
+//        int[] crLeft = new int[] { null, null, null, null };
 
-        CoeffToken[] cbLeft = new CoeffToken[] { null, null, null, null };
-        CoeffToken[] crLeft = new CoeffToken[] { null, null, null, null };
-
-        MBlockNeighbourhood neighbourhood = new MBlockNeighbourhood(lumaLeft, null, cbLeft, null, crLeft, null, null,
-                null, true, false);
+        MBlockNeighbourhood neighbourhood = new MBlockNeighbourhood(null, null, null, null, null, null, null,
+                null, false, false);
 
         MBlockIntra16x16 actual = intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 0, 0);
 

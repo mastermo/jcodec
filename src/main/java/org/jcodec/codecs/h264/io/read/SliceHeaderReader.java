@@ -7,10 +7,10 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
+import static org.jcodec.common.model.ColorSpace.MONO;
 
 import java.util.ArrayList;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
@@ -193,7 +193,7 @@ public class SliceHeaderReader {
     private static void readPredWeightTable(SeqParameterSet sps, PictureParameterSet pps, SliceHeader sh, BitReader in) {
         sh.pred_weight_table = new PredictionWeightTable();
         sh.pred_weight_table.luma_log2_weight_denom = readUE(in, "SH: luma_log2_weight_denom");
-        if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
+        if (sps.chroma_format_idc != MONO) {
             sh.pred_weight_table.chroma_log2_weight_denom = readUE(in, "SH: chroma_log2_weight_denom");
         }
         int numRefsL0 = sh.num_ref_idx_active_override_flag ? sh.num_ref_idx_l0_active_minus1 + 1
@@ -209,7 +209,7 @@ public class SliceHeaderReader {
 
                 sh.pred_weight_table.luma_offset_weight_l0[i] = ow;
             }
-            if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
+            if (sps.chroma_format_idc != MONO) {
                 boolean chroma_weight_l0_flag = readBool(in, "SH: chroma_weight_l0_flag");
                 if (chroma_weight_l0_flag) {
                     sh.pred_weight_table.chroma_offset_weight_l0[i] = new OffsetWeight[2];
@@ -235,7 +235,7 @@ public class SliceHeaderReader {
                     ow.offset = readSE(in, "SH: offset");
                     sh.pred_weight_table.luma_offset_weight_l1[i] = ow;
                 }
-                if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
+                if (sps.chroma_format_idc != MONO) {
                     boolean chroma_weight_l1_flag = readBool(in, "SH: chroma_weight_l1_flag");
                     if (chroma_weight_l1_flag) {
                         sh.pred_weight_table.chroma_offset_weight_l1[i] = new OffsetWeight[2];

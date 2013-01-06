@@ -6,9 +6,10 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,7 +34,7 @@ public class FrameCache {
 
     private static int DATASEG_SIZE = 1024 * 1024 * 10;
 
-    private RandomAccessFile fd;
+    private FileChannel fd;
     private TIntObjectHashMap<IndexRecord> index;
     private List<Long> dataSegments = new ArrayList<Long>();
     private MediaInfo mediaInfo;
@@ -64,7 +65,7 @@ public class FrameCache {
     }
 
     public FrameCache(File cacheWhere) throws IOException {
-        fd = new RandomAccessFile(cacheWhere, "rwd");
+        fd = new FileInputStream(cacheWhere).getChannel();
         loadData(fd);
         addDataSegment();
     }
@@ -76,23 +77,23 @@ public class FrameCache {
         }
     }
 
-    public void loadData(RandomAccessFile f) throws IOException {
+    public void loadData(FileChannel f) throws IOException {
         index = new TIntObjectHashMap<IndexRecord>();
         pts2frame = new TLongIntHashMap(1, 0.5f, -1, -1);
 
-        while (f.getFilePointer() + 5 <= f.length()) {
-            int segmentType = f.read();
-            int segmentSize = f.readInt();
+        while (f.position() + 5 <= f.size()) {
+            int segmentType = NIOUtils.readByte(f);
+            int segmentSize = NIOUtils.readInt(f);
 
-            if (f.getFilePointer() + segmentSize > f.length()) {
+            if (f.position() + segmentSize > f.size()) {
                 // invelid segment, file corruption starts here
-                f.seek(f.getFilePointer() - 5);
+                f.position(f.position() - 5);
                 break;
             }
 
             if (segmentType == DATA_SEGMENT) {
-                dataSegments.add(f.getFilePointer());
-                f.seek(f.getFilePointer() + segmentSize);
+                dataSegments.add(f.position());
+                f.position(f.position() + segmentSize);
             } else if (segmentType == INDEX_SEGMENT) {
                 ByteBuffer buffer = NIOUtils.fetchFrom(f, segmentSize);
                 while (buffer.remaining() >= 29) {
@@ -104,7 +105,7 @@ public class FrameCache {
                 }
             } else {
                 // invalid segment, file corruption starts here
-                f.seek(f.getFilePointer() - 5);
+                f.position(f.position() - 5);
                 break;
             }
         }
@@ -125,12 +126,12 @@ public class FrameCache {
             if (fd == null)
                 return null;
 
-            fd.seek(record.pos);
+            fd.position(record.pos);
 
             int dsOff = (int) (record.pos - getDataSegmentOff(record));
             while (out.remaining() > 0) {
                 int toRead = Math.min(out.remaining(), DATASEG_SIZE - dsOff);
-                NIOUtils.read(fd.getChannel(), out, toRead);
+                NIOUtils.read(fd, out, toRead);
                 if (out.remaining() > 0) {
                     skipToDataseg();
                     dsOff = 0;
@@ -144,14 +145,14 @@ public class FrameCache {
     }
 
     private void skipToDataseg() throws IOException {
-        while (fd.getFilePointer() + 5 <= fd.length()) {
-            int segType = fd.read();
-            int segSize = fd.readInt();
+        while (fd.position() + 5 <= fd.size()) {
+            int segType = NIOUtils.readByte(fd);
+            int segSize = NIOUtils.readInt(fd);
             if (segType != DATA_SEGMENT && segType != INDEX_SEGMENT)
                 throw new IOException("Invalid segment: " + segType);
             if (segType == DATA_SEGMENT)
                 return;
-            fd.seek(fd.getFilePointer() + segSize);
+            fd.position(fd.position() + segSize);
         }
     }
 
@@ -191,8 +192,8 @@ public class FrameCache {
         synchronized (fd) {
             if (fd == null)
                 return;
-            fd.seek(dataSegments.get(dataSegments.size() - 1) + dsFill);
-            long pos = fd.getFilePointer();
+            fd.position(dataSegments.get(dataSegments.size() - 1) + dsFill);
+            long pos = fd.position();
             ByteBuffer data = packet.getData().duplicate();
 
             IndexRecord record = new IndexRecord((int) packet.getFrameNo(), pos, packet.getData().remaining(),
@@ -201,7 +202,7 @@ public class FrameCache {
 
             while (data.remaining() > 0) {
                 ByteBuffer piece = NIOUtils.read(data, Math.min(data.remaining(), DATASEG_SIZE - dsFill));
-                fd.getChannel().write(piece);
+                fd.write(piece);
                 dsFill += piece.remaining();
 
                 if (dsFill == DATASEG_SIZE) {
@@ -225,14 +226,14 @@ public class FrameCache {
     }
 
     private void addDataSegment() throws IOException {
-        fd.write(DATA_SEGMENT);
-        fd.writeInt(DATASEG_SIZE);
-        dataSegments.add(fd.getFilePointer());
+        NIOUtils.writeByte(fd, (byte) DATA_SEGMENT);
+        NIOUtils.writeInt(fd, DATASEG_SIZE);
+        dataSegments.add(fd.position());
     }
 
-    private void writeIndex(RandomAccessFile fd, List<IndexRecord> dsFrames) throws IOException {
-        fd.write(INDEX_SEGMENT);
-        fd.writeInt(dsFrames.size() * 29);
+    private void writeIndex(FileChannel fd, List<IndexRecord> dsFrames) throws IOException {
+        NIOUtils.writeByte(fd, (byte) INDEX_SEGMENT);
+        NIOUtils.writeInt(fd, dsFrames.size() * 29);
         ByteBuffer buf = ByteBuffer.allocate(dsFrames.size() * 29);
         for (IndexRecord indexRecord : dsFrames) {
             buf.putInt(indexRecord.frameNo);
@@ -243,7 +244,7 @@ public class FrameCache {
             buf.put((byte) (indexRecord.key ? 1 : 0));
         }
         buf.flip();
-        NIOUtils.writeTo(buf, fd);
+        fd.write(buf);
     }
 
     public boolean hasFrame(int i) {

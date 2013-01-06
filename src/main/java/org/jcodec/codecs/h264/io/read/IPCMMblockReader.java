@@ -1,8 +1,8 @@
 package org.jcodec.codecs.h264.io.read;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBlockIPCM;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -15,11 +15,11 @@ import org.jcodec.common.io.BitReader;
  */
 public class IPCMMblockReader {
 
-    private ChromaFormat chromaFormat;
+    private ColorSpace chromaFormat;
     private int bitDepthLuma;
     private int bitDepthChroma;
 
-    public IPCMMblockReader(ChromaFormat chromaFormat, int bitDepthLuma, int bitDepthChroma) {
+    public IPCMMblockReader(ColorSpace chromaFormat, int bitDepthLuma, int bitDepthChroma) {
 
         this.chromaFormat = chromaFormat;
         this.bitDepthLuma = bitDepthLuma;
@@ -33,8 +33,8 @@ public class IPCMMblockReader {
         for (int i = 0; i < 256; i++) {
             samplesLuma[i] = reader.readNBit(bitDepthLuma);
         }
-        int MbWidthC = 16 / chromaFormat.getSubWidth();
-        int MbHeightC = 16 / chromaFormat.getSubHeight();
+        int MbWidthC = 16 >> chromaFormat.compWidth[1];
+        int MbHeightC = 16 >> chromaFormat.compHeight[1];
 
         int[] samplesChroma = new int[2 * MbWidthC * MbHeightC];
         for (int i = 0; i < 2 * MbWidthC * MbHeightC; i++) {

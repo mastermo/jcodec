@@ -3,8 +3,6 @@ package org.jcodec.common.io;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.jcodec.codecs.h264.io.CharCache;
-
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
@@ -21,8 +19,6 @@ public class DummyBitstreamReader {
     private int secondByte;
     int nBit;
     protected static int bitsRead;
-
-    protected CharCache debugBits = new CharCache(50);
 
     public DummyBitstreamReader(InputStream is) throws IOException {
         this.is = is;
@@ -54,7 +50,7 @@ public class DummyBitstreamReader {
         int res = (curByte >> (7 - nBit)) & 1;
         nBit++;
 
-        debugBits.append(res == 0 ? '0' : '1');
+//        debugBits.append(res == 0 ? '0' : '1');
         ++bitsRead;
 
         return res;

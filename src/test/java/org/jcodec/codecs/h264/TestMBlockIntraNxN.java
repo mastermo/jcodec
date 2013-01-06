@@ -1,9 +1,10 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.codecs.h264.io.CAVLC.coeffToken;
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import java.nio.ByteBuffer;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.IntraNxNPrediction;
 import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
@@ -30,38 +31,38 @@ public class TestMBlockIntraNxN extends JAVCTestCase {
 
         BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil.binaryStringToBytes(bits)));
 
-        IntraMBlockReader intraMBlockReader = new IntraMBlockReader(false, ChromaFormat.YUV_420, false);
+        IntraMBlockReader intraMBlockReader = new IntraMBlockReader(false, YUV420, false);
 
         // MB 81
         IntraNxNPrediction predTop = new IntraNxNPrediction(
                 new int[] { 5, 6, 4, 5, 1, 4, 4, 5, 5, 5, 0, 4, 6, 4, 4, 4 }, 1);
 
-        CoeffToken[] lumaTop = new CoeffToken[] { new CoeffToken(3, 1), new CoeffToken(1, 1), new CoeffToken(8, 3),
-                new CoeffToken(2, 2), new CoeffToken(2, 2), new CoeffToken(1, 1), new CoeffToken(0, 0),
-                new CoeffToken(1, 1), new CoeffToken(2, 1), new CoeffToken(7, 3), new CoeffToken(0, 0),
-                new CoeffToken(3, 3), new CoeffToken(5, 3), new CoeffToken(0, 0), new CoeffToken(9, 3),
-                new CoeffToken(3, 3) };
+        int[] lumaTop = new int[] { coeffToken(3, 1), coeffToken(1, 1), coeffToken(8, 3),
+                coeffToken(2, 2), coeffToken(2, 2), coeffToken(1, 1), coeffToken(0, 0),
+                coeffToken(1, 1), coeffToken(2, 1), coeffToken(7, 3), coeffToken(0, 0),
+                coeffToken(3, 3), coeffToken(5, 3), coeffToken(0, 0), coeffToken(9, 3),
+                coeffToken(3, 3) };
 
-        CoeffToken[] cbTop = new CoeffToken[] { new CoeffToken(1, 1), new CoeffToken(0, 0), new CoeffToken(1, 1),
-                new CoeffToken(0, 0) };
+        int[] cbTop = new int[] { coeffToken(1, 1), coeffToken(0, 0), coeffToken(1, 1),
+                coeffToken(0, 0) };
 
-        CoeffToken[] crTop = new CoeffToken[] { new CoeffToken(3, 2), new CoeffToken(0, 0), new CoeffToken(2, 2),
-                new CoeffToken(2, 2) };
+        int[] crTop = new int[] { coeffToken(3, 2), coeffToken(0, 0), coeffToken(2, 2),
+                coeffToken(2, 2) };
 
         // MB 91
         IntraNxNPrediction predLeft = new IntraNxNPrediction(
                 new int[] { 2, 4, 2, 5, 5, 0, 5, 5, 1, 1, 3, 7, 8, 5, 7, 5 }, 3);
 
-        CoeffToken[] lumaLeft = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(4, 3), new CoeffToken(0, 0),
-                new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(2, 2),
-                new CoeffToken(6, 1), new CoeffToken(5, 2), new CoeffToken(7, 3), new CoeffToken(3, 3),
-                new CoeffToken(4, 3), new CoeffToken(2, 2), new CoeffToken(3, 3), new CoeffToken(6, 3),
-                new CoeffToken(3, 3) };
+        int[] lumaLeft = new int[] { coeffToken(0, 0), coeffToken(4, 3), coeffToken(0, 0),
+                coeffToken(0, 0), coeffToken(0, 0), coeffToken(0, 0), coeffToken(2, 2),
+                coeffToken(6, 1), coeffToken(5, 2), coeffToken(7, 3), coeffToken(3, 3),
+                coeffToken(4, 3), coeffToken(2, 2), coeffToken(3, 3), coeffToken(6, 3),
+                coeffToken(3, 3) };
 
-        CoeffToken[] cbLeft = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-                new CoeffToken(0, 0) };
-        CoeffToken[] crLeft = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-                new CoeffToken(0, 0) };
+        int[] cbLeft = new int[] { coeffToken(0, 0), coeffToken(0, 0), coeffToken(0, 0),
+                coeffToken(0, 0) };
+        int[] crLeft = new int[] { coeffToken(0, 0), coeffToken(0, 0), coeffToken(0, 0),
+                coeffToken(0, 0) };
 
         MBlockNeighbourhood neighbourhood = new MBlockNeighbourhood(lumaLeft, lumaTop, cbLeft, cbTop, crLeft, crTop,
                 predLeft, predTop, true, true);

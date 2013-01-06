@@ -16,7 +16,7 @@ public class MBlockIntra16x16 extends CodedMacroblock {
     private int chromaMode;
 
     public MBlockIntra16x16(CodedChroma chroma, int qpDelta, ResidualBlock lumaDC, ResidualBlock[] lumaAC,
-            CoeffToken[] lumaTokens, int lumaMode, int chromaMode) {
+            int[] lumaTokens, int lumaMode, int chromaMode) {
         super(qpDelta, chroma, lumaTokens);
         this.lumaDC = lumaDC;
         this.lumaAC = lumaAC;

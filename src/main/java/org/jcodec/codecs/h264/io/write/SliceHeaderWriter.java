@@ -4,8 +4,8 @@ import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeBool;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeSE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeU;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeUE;
+import static org.jcodec.common.model.ColorSpace.MONO;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.RefPicMarking;
 import org.jcodec.codecs.h264.io.model.RefPicMarking.Instruction;
@@ -167,7 +167,7 @@ public class SliceHeaderWriter {
 
     private void writePredWeightTable(SliceHeader sliceHeader, BitWriter writer) {
         writeUE(writer, sliceHeader.pred_weight_table.luma_log2_weight_denom, "SH: luma_log2_weight_denom");
-        if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
+        if (sps.chroma_format_idc != MONO) {
             writeUE(writer, sliceHeader.pred_weight_table.chroma_log2_weight_denom, "SH: chroma_log2_weight_denom");
         }
 
@@ -177,7 +177,7 @@ public class SliceHeaderWriter {
                 writeSE(writer, sliceHeader.pred_weight_table.luma_offset_weight_l0[i].weight, "SH: ");
                 writeSE(writer, sliceHeader.pred_weight_table.luma_offset_weight_l0[i].offset, "SH: ");
             }
-            if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
+            if (sps.chroma_format_idc != MONO) {
                 writeBool(writer, sliceHeader.pred_weight_table.chroma_offset_weight_l0[i] != null,
                         "SH: chroma_weight_l0_flag");
                 if (sliceHeader.pred_weight_table.chroma_offset_weight_l0[i] != null)
@@ -195,7 +195,7 @@ public class SliceHeaderWriter {
                     writeSE(writer, sliceHeader.pred_weight_table.luma_offset_weight_l1[i].weight, "SH: ");
                     writeSE(writer, sliceHeader.pred_weight_table.luma_offset_weight_l1[i].offset, "SH: ");
                 }
-                if (sps.chroma_format_idc != ChromaFormat.MONOCHROME) {
+                if (sps.chroma_format_idc != MONO) {
                     writeBool(writer, sliceHeader.pred_weight_table.chroma_offset_weight_l1[i] != null,
                             "SH: chroma_weight_l0_flag");
                     if (sliceHeader.pred_weight_table.chroma_offset_weight_l1[i] != null)

@@ -28,16 +28,19 @@ public class VLCBuilder {
         }
     }
 
-    public void set(int val, String code) {
+    public VLCBuilder set(int val, String code) {
         set(Integer.parseInt(code, 2), code.length(), val);
+        
+        return this;
     }
 
-    public void set(int code, int len, int val) {
+    public VLCBuilder set(int code, int len, int val) {
         codes.add(code << (32 - len));
         codesSizes.add(len);
         forward.put(val, codes.size() - 1);
         inverse.put(codes.size() - 1, val);
 
+        return this;
     }
 
     public VLC getVLC() {

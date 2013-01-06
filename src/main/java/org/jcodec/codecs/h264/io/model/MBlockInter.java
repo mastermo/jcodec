@@ -26,7 +26,7 @@ public class MBlockInter extends MBlockWithResidual {
         this.type = type;
     }
 
-    public MBlockInter(int qpDelta, CodedChroma chroma, CoeffToken[] lumaTokens, ResidualBlock[] luma,
+    public MBlockInter(int qpDelta, CodedChroma chroma, int[] lumaTokens, ResidualBlock[] luma,
             InterPrediction prediction, Type type) {
         super(qpDelta, chroma, lumaTokens, luma);
         this.prediction = prediction;

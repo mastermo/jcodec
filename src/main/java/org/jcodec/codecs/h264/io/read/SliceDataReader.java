@@ -10,9 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jcodec.codecs.h264.decode.aso.MBlockMapper;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CodedMacroblock;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.IntraNxNPrediction;
 import org.jcodec.codecs.h264.io.model.MBlockIPCM;
 import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
@@ -21,6 +19,7 @@ import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.Macroblock;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -38,14 +37,14 @@ public class SliceDataReader {
     private boolean frameMbsOnly;
 
     private boolean transform8x8;
-    private ChromaFormat chromaFormat;
+    private ColorSpace chromaFormat;
     private int bitDepthLuma;
     private int bitDepthChroma;
     private int numRefIdxL0Active;
     private int numRefIdxL1Active;
     private boolean constrainedIntraPred;
 
-    public SliceDataReader(boolean transform8x8, ChromaFormat chromaFormat, boolean entropyCoding, boolean mbaff,
+    public SliceDataReader(boolean transform8x8, ColorSpace chromaFormat, boolean entropyCoding, boolean mbaff,
             boolean frameMbsOnly, int numSliceGroups, int bitDepthLuma, int bitDepthChroma, int numRefIdxL0Active,
             int numRefIdxL1Active, boolean constrainedIntraPred) {
         this.entropyCoding = entropyCoding;
@@ -166,17 +165,8 @@ public class SliceDataReader {
         return mblocks.toArray(new Macroblock[] {});
     }
 
-    private static CoeffToken[] EMPTY_LUMA = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0),
-            new CoeffToken(0, 0), new CoeffToken(0, 0),
-
-            new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-
-            new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-
-            new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0) };
-
-    private static CoeffToken[] EMPTY_CHROMA = new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0),
-            new CoeffToken(0, 0), new CoeffToken(0, 0) };
+    private static int[] EMPTY_LUMA = new int[16];
+    private static int[] EMPTY_CHROMA = new int[5];
 
     private MBlockNeighbourhood calcNeighbourhood(int mbIndex, List<Macroblock> mblocks, MBlockMapper mBlockMap) {
 
@@ -184,9 +174,9 @@ public class SliceDataReader {
         IntraNxNPrediction predLeft = null;
         IntraNxNPrediction predTop = null;
 
-        CoeffToken[] lumaTokensLeft = null;
-        CoeffToken[] cbTokensLeft = null;
-        CoeffToken[] crTokensLeft = null;
+        int[] lumaTokensLeft = null;
+        int[] cbTokensLeft = null;
+        int[] crTokensLeft = null;
         int leftIndex = mBlockMap.getLeftMBIdx(mbIndex);
         if (leftIndex != -1) {
             Macroblock leftMb = mblocks.get(leftIndex);
@@ -208,9 +198,9 @@ public class SliceDataReader {
             leftAvailable = !constrainedIntraPred || leftIntra;
         }
 
-        CoeffToken[] lumaTokensTop = null;
-        CoeffToken[] cbTokensTop = null;
-        CoeffToken[] crTokensTop = null;
+        int[] lumaTokensTop = null;
+        int[] cbTokensTop = null;
+        int[] crTokensTop = null;
         int topIndex = mBlockMap.getTopMBIdx(mbIndex);
         if (topIndex != -1) {
             Macroblock topMb = mblocks.get(topIndex);

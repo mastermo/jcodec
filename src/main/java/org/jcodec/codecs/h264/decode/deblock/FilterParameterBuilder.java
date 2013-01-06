@@ -4,7 +4,6 @@ import org.jcodec.codecs.h264.decode.deblock.FilterParameter.Threshold;
 import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
 import org.jcodec.codecs.h264.decode.model.MVMatrix;
 import org.jcodec.codecs.h264.io.model.CodedMacroblock;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
 import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
 import org.jcodec.codecs.h264.io.model.Vector;
@@ -149,21 +148,16 @@ public class FilterParameterBuilder {
         else if (leftIntra || rightIntra)
             return 3;
         else {
-            CoeffToken leftToken;
+            int leftToken = 0;
             if (codedA != null && (codedA instanceof CodedMacroblock)) {
                 leftToken = ((CodedMacroblock) codedA).getLumaTokens()[inverse[blkAAddr]];
-            } else {
-                leftToken = new CoeffToken(0, 0);
             }
-            CoeffToken rightToken;
-
+            int rightToken = 0;
             if (codedB != null && (codedB instanceof CodedMacroblock)) {
                 rightToken = ((CodedMacroblock) codedB).getLumaTokens()[inverse[blkBAddr]];
-            } else {
-                rightToken = new CoeffToken(0, 0);
             }
 
-            if (leftToken.totalCoeff > 0 || rightToken.totalCoeff > 0)
+            if ((leftToken >> 4) > 0 || (rightToken >> 4) > 0)
                 return 2;
 
             MVMatrix mvA = mbA.getDecodedMVs();

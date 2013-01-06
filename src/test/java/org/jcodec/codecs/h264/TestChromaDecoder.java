@@ -1,9 +1,10 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import org.jcodec.codecs.h264.decode.ChromaDecoder;
 import org.jcodec.codecs.h264.decode.model.DecodedChroma;
 import org.jcodec.codecs.h264.decode.model.NearbyPixels;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 import org.junit.Test;
@@ -102,7 +103,7 @@ public class TestChromaDecoder extends JAVCTestCase {
 		};
 		
 		ChromaDecoder decoder = new ChromaDecoder(new int[] { 0, 0 }, 8,
-				ChromaFormat.YUV_420);
+				YUV420);
 		NearbyPixels.Plane nCb = new NearbyPixels.Plane(mb40Cb, mb30Cb, mb29Cb,
 				null);
 		NearbyPixels.Plane nCr = new NearbyPixels.Plane(mb40Cr, mb30Cr, mb29Cr,
@@ -213,7 +214,7 @@ public class TestChromaDecoder extends JAVCTestCase {
 		};
 		
 		ChromaDecoder decoder = new ChromaDecoder(new int[] { 0, 0 }, 8,
-				ChromaFormat.YUV_420);
+				YUV420);
 		NearbyPixels.Plane nCb = new NearbyPixels.Plane(mb57Cb, mb47Cb, mb46Cb,
 				null);
 		NearbyPixels.Plane nCr = new NearbyPixels.Plane(mb57Cr, mb47Cr, mb46Cr,

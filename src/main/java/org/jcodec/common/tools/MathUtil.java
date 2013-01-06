@@ -114,4 +114,13 @@ public class MathUtil {
         n = n + 1;
         return n;
     }
+    
+    public static final int abs(int val) {
+        int sign = (val >> 31);
+        return (val ^ sign) - sign;
+    }
+    
+    public static final int golomb(int signedLevel) {
+        return (abs(signedLevel) << 1) + (signedLevel >>> 31);
+    }
 }

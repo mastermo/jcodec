@@ -5,7 +5,6 @@ import org.jcodec.codecs.h264.decode.deblock.DeblockingFilter;
 import org.jcodec.codecs.h264.decode.deblock.FilterParameter;
 import org.jcodec.codecs.h264.decode.deblock.FilterParameterBuilder;
 import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
@@ -186,16 +185,16 @@ public class TestDeblockingFilter extends JAVCTestCase {
 		
 		DecodedMBlock[] decoded = new DecodedMBlock[] {
 				new DecodedMBlock(null, null, 28, null, null,
-						new MBlockIntraNxN(0, null, new CoeffToken[16], null,
+						new MBlockIntraNxN(0, null, new int[16], null,
 								null)),
 				new DecodedMBlock(null, null, 26, null, null,
-						new MBlockIntraNxN(-2, null, new CoeffToken[16], null,
+						new MBlockIntraNxN(-2, null, new int[16], null,
 								null)),
 				new DecodedMBlock(null, null, 28, null, null,
-						new MBlockIntraNxN(2, null, new CoeffToken[16], null,
+						new MBlockIntraNxN(2, null, new int[16], null,
 								null)),
 				new DecodedMBlock(null, null, 26, null, null,
-						new MBlockIntraNxN(-2, null, new CoeffToken[16], null,
+						new MBlockIntraNxN(-2, null, new int[16], null,
 								null)) };
 
 		FilterParameterBuilder builder = new FilterParameterBuilder();

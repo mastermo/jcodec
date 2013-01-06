@@ -39,8 +39,8 @@ public class BitWriter {
     public final void writeNBit(int value, int n) {
         if (n > 32)
             throw new IllegalArgumentException("Max 32 bit to write");
+        value &= -1 >>> (32 - n);
         if (32 - curBit >= n) {
-            value &= (1 << n) - 1;
             curInt |= value << (32 - curBit - n);
             curBit += n;
             if (curBit == 32) {

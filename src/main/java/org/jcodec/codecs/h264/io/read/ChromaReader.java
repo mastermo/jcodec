@@ -1,13 +1,17 @@
 package org.jcodec.codecs.h264.io.read;
 
-import java.io.IOException;
+import static org.jcodec.common.model.ColorSpace.MONO;
+import static org.jcodec.common.model.ColorSpace.YUV422;
+import static org.jcodec.common.model.ColorSpace.YUV444;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
+import org.jcodec.codecs.h264.H264Const;
+import org.jcodec.codecs.h264.io.CAVLC;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.io.VLC;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -19,12 +23,10 @@ import org.jcodec.common.io.BitReader;
  * 
  */
 public class ChromaReader {
-    private ChromaFormat chromaFormat;
+    private ColorSpace chromaFormat;
     private boolean entropyCoding;
 
-    private CoeffTokenReader coeffTokenReader;
-    private ResidualCoeffsCABACReader cabacReader;
-    private ResidualCoeffsCAVLCReader cavlcReader;
+    private CAVLC cavlcReader;
 
     static int[] mappingTop4x4 = { 20, 21, 0, 1, 22, 23, 4, 5, 2, 3, 8, 9, 6, 7, 12, 13 };
     static int[] mappingLeft4x4 = { 16, 0, 17, 2, 1, 4, 3, 6, 18, 8, 19, 10, 9, 12, 11, 14 };
@@ -35,21 +37,19 @@ public class ChromaReader {
     static int[] mappingTop2x2 = { 6, 7, 0, 1 };
     static int[] mappingLeft2x2 = { 4, 0, 5, 2 };
 
-    public ChromaReader(ChromaFormat chromaFormat, boolean entropyCoding) {
+    public ChromaReader(ColorSpace chromaFormat, boolean entropyCoding) {
         this.chromaFormat = chromaFormat;
         this.entropyCoding = entropyCoding;
 
-        coeffTokenReader = new CoeffTokenReader(chromaFormat);
-        cavlcReader = new ResidualCoeffsCAVLCReader(chromaFormat);
-        cabacReader = new ResidualCoeffsCABACReader();
+        cavlcReader = new CAVLC(chromaFormat);
     }
 
-    public CodedChroma readChroma(BitReader reader, int pattern, MBlockNeighbourhood neighbourhood)  {
+    public CodedChroma readChroma(BitReader reader, int pattern, MBlockNeighbourhood neighbourhood) {
 
         ResidualBlock cbDC = null;
         ResidualBlock crDC = null;
 
-        if (chromaFormat != ChromaFormat.MONOCHROME) {
+        if (chromaFormat != MONO) {
             if (!entropyCoding) {
                 BlocksWithTokens cbAC = null;
                 BlocksWithTokens crAC = null;
@@ -59,8 +59,10 @@ public class ChromaReader {
                 }
 
                 if ((pattern & 2) > 0) {
-                    cbAC = readChromaAC(reader, neighbourhood.getCbLeft(), neighbourhood.getCbTop());
-                    crAC = readChromaAC(reader, neighbourhood.getCrLeft(), neighbourhood.getCrTop());
+                    cbAC = readChromaAC(reader, neighbourhood.getCbLeft(), neighbourhood.getCbTop(),
+                            neighbourhood.isLeftAvailable(), neighbourhood.isTopAvailable());
+                    crAC = readChromaAC(reader, neighbourhood.getCrLeft(), neighbourhood.getCrTop(),
+                            neighbourhood.isLeftAvailable(), neighbourhood.isTopAvailable());
                 }
 
                 if (cbAC == null)
@@ -71,19 +73,7 @@ public class ChromaReader {
 
                 return new CodedChroma(cbDC, cbAC.getBlock(), crDC, crAC.getBlock(), cbAC.getToken(), crAC.getToken());
             } else {
-                ResidualBlock[] cbAC = null;
-                ResidualBlock[] crAC = null;
-                if ((pattern & 3) > 0) {
-                    cbDC = readChromaDC(reader);
-                    crDC = readChromaDC(reader);
-                }
-
-                if ((pattern & 2) > 0) {
-                    cbAC = readChromaACCabac(reader);
-                    crAC = readChromaACCabac(reader);
-                }
-
-                return new CodedChroma(cbDC, cbAC, crDC, crAC, null, null);
+                throw new RuntimeException("CABAC");
             }
         }
 
@@ -92,48 +82,49 @@ public class ChromaReader {
 
     private BlocksWithTokens handleNullResidual() {
 
-        int nTokens = 16 / (chromaFormat.getSubWidth() * chromaFormat.getSubHeight());
+        int nTokens = (16 >> chromaFormat.compWidth[1]) >> chromaFormat.compHeight[1];
 
-        CoeffToken[] tokens = new CoeffToken[nTokens];
+        int[] tokens = new int[nTokens];
         ResidualBlock[] blocks = new ResidualBlock[nTokens];
 
         for (int i = 0; i < tokens.length; i++) {
-            tokens[i] = new CoeffToken(0, 0);
             blocks[i] = new ResidualBlock(new int[16]);
         }
 
         return new BlocksWithTokens(blocks, tokens);
     }
 
-    private ResidualBlock readChromaDC(BitReader reader)  {
+    private ResidualBlock readChromaDC(BitReader reader) {
         ResidualBlock blk;
 
         if (!entropyCoding) {
-            CoeffToken coeffToken = coeffTokenReader.readForChromaDC(reader);
-
-            blk = new ResidualBlock(cavlcReader.readCoeffs(reader, ResidualBlock.BlockType.BLOCK_CHROMA_DC, coeffToken));
+            int[] coeff = new int[(16 >> chromaFormat.compWidth[1]) >> chromaFormat.compHeight[1]];
+            cavlcReader.readCoeffs(reader, cavlcReader.getCoeffTokenVLCForChromaDC(),
+                    coeff.length == 16 ? H264Const.totalZeros16 : (coeff.length == 8 ? H264Const.totalZeros8
+                            : H264Const.totalZeros4), coeff);
+            blk = new ResidualBlock(coeff);
         } else {
-            blk = new ResidualBlock(cabacReader.readCoeffs(reader));
+            throw new RuntimeException("CABAC!");
         }
 
         return blk;
     }
 
-    private BlocksWithTokens readChromaAC(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
+    private BlocksWithTokens readChromaAC(BitReader reader, int[] left, int[] top, boolean b, boolean c) {
 
-        if (chromaFormat == ChromaFormat.YUV_444)
-            return readChromaAC444(reader, left, top);
+        if (chromaFormat == YUV444)
+            return readChromaAC444(reader, left, top, b, c);
 
-        else if (chromaFormat == ChromaFormat.YUV_422)
-            return readChromaAC422(reader, left, top);
+        else if (chromaFormat == YUV422)
+            return readChromaAC422(reader, left, top, b, c);
 
         else
-            return readChromaAC420(reader, left, top);
+            return readChromaAC420(reader, left, top, b, c);
 
     }
 
-    private BlocksWithTokens readChromaAC444(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
-        CoeffToken[] pred = new CoeffToken[24];
+    private BlocksWithTokens readChromaAC444(BitReader reader, int[] left, int[] top, boolean b, boolean c) {
+        int[] pred = new int[24];
         pred[16] = left[5];
         pred[17] = left[7];
         pred[18] = left[13];
@@ -143,13 +134,13 @@ public class ChromaReader {
         pred[22] = top[14];
         pred[23] = top[15];
 
-        return readChromaACSub(reader, pred, 4, mappingLeft4x4, mappingTop4x4);
+        return readChromaACSub(reader, pred, 4, mappingLeft4x4, mappingTop4x4, b, c);
 
     }
 
-    private BlocksWithTokens readChromaAC422(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
+    private BlocksWithTokens readChromaAC422(BitReader reader, int[] left, int[] top, boolean b, boolean c) {
 
-        CoeffToken[] pred = new CoeffToken[14];
+        int[] pred = new int[14];
         pred[8] = left[5];
         pred[9] = left[7];
         pred[10] = left[2];
@@ -157,53 +148,45 @@ public class ChromaReader {
         pred[12] = left[6];
         pred[13] = left[7];
 
-        return readChromaACSub(reader, pred, 2, mappingLeft4x2, mappingTop4x2);
+        return readChromaACSub(reader, pred, 2, mappingLeft4x2, mappingTop4x2, b, c);
 
     }
 
-    private BlocksWithTokens readChromaAC420(BitReader reader, CoeffToken[] left, CoeffToken[] top)  {
+    private BlocksWithTokens readChromaAC420(BitReader reader, int[] left, int[] top, boolean b, boolean c) {
 
-        CoeffToken[] pred = new CoeffToken[8];
+        int[] pred = new int[8];
         pred[4] = left != null ? left[1] : null;
         pred[5] = left != null ? left[3] : null;
         pred[6] = top != null ? top[2] : null;
         pred[7] = top != null ? top[3] : null;
 
-        return readChromaACSub(reader, pred, 1, mappingLeft2x2, mappingTop2x2);
+        return readChromaACSub(reader, pred, 1, mappingLeft2x2, mappingTop2x2, b, c);
     }
 
-    private BlocksWithTokens readChromaACSub(BitReader reader, CoeffToken[] pred, int NumC8x8, int[] mapLeft, int[] mapTop)
-             {
+    private BlocksWithTokens readChromaACSub(BitReader reader, int[] pred, int NumC8x8, int[] mapLeft, int[] mapTop,
+            boolean leftAvailable, boolean topAvailable) {
+        boolean[] la = new boolean[] { leftAvailable, true, leftAvailable, true, true, true, true, true, leftAvailable,
+                true, leftAvailable, true, true, true, true, true };
+        boolean[] ta = new boolean[] { topAvailable, topAvailable, true, true, topAvailable, topAvailable, true, true,
+                true, true, true, true, true, true, true, true };
 
-        CoeffToken[] tokens = new CoeffToken[NumC8x8 * 4];
+        int[] tokens = new int[NumC8x8 * 4];
         ResidualBlock[] chromaACLevel = new ResidualBlock[NumC8x8 * 4];
         for (int i8x8 = 0; i8x8 < NumC8x8; i8x8++) {
             for (int i4x4 = 0; i4x4 < 4; i4x4++) {
                 int blkAddr = i8x8 * 4 + i4x4;
-                CoeffToken coeffToken = coeffTokenReader.read(reader, pred[mapLeft[blkAddr]], pred[mapTop[blkAddr]]);
 
-                chromaACLevel[blkAddr] = new ResidualBlock(cavlcReader.readCoeffs(reader,
-                        ResidualBlock.BlockType.BLOCK_CHROMA_AC, coeffToken));
+                VLC coeffTokenTable = cavlcReader.getCoeffTokenVLCForLuma(la[blkAddr], pred[mappingLeft4x4[blkAddr]],
+                        ta[blkAddr], pred[mappingTop4x4[blkAddr]]);
 
-                pred[blkAddr] = coeffToken;
-                tokens[blkAddr] = coeffToken;
+                int[] coeff = new int[15];
+                int readCoeffs = cavlcReader.readCoeffs(reader, coeffTokenTable, H264Const.totalZeros16, coeff);
+                chromaACLevel[blkAddr] = new ResidualBlock(coeff);
+                pred[blkAddr] = readCoeffs;
+                tokens[blkAddr] = readCoeffs;
             }
         }
 
         return new BlocksWithTokens(chromaACLevel, tokens);
-    }
-
-    private ResidualBlock[] readChromaACCabac(BitReader reader)  {
-
-        int NumC8x8 = 4 / (chromaFormat.getSubWidth() * chromaFormat.getSubHeight());
-
-        ResidualBlock[] chromaACLevel = new ResidualBlock[NumC8x8 * 4];
-        for (int i8x8 = 0; i8x8 < NumC8x8; i8x8++) {
-            for (int i4x4 = 0; i4x4 < 4; i4x4++) {
-                chromaACLevel[i8x8 * 4 + i4x4] = new ResidualBlock(cabacReader.readCoeffs(reader));
-            }
-        }
-
-        return chromaACLevel;
     }
 }

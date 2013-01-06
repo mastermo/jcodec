@@ -1,10 +1,11 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.codecs.h264.io.CAVLC.coeffToken;
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import java.nio.ByteBuffer;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.read.ChromaReader;
 import org.jcodec.codecs.util.BinUtil;
@@ -20,7 +21,7 @@ public class TestChroma extends JAVCTestCase {
 
         BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil.binaryStringToBytes(bits)));
 
-        ChromaReader chromaReader = new ChromaReader(ChromaFormat.YUV_420, false);
+        ChromaReader chromaReader = new ChromaReader(YUV420, false);
 
         int codedBlockPattern = 47;
         int codedBlockPatternChroma = codedBlockPattern / 16;
@@ -43,15 +44,15 @@ public class TestChroma extends JAVCTestCase {
         assertArrayEquals(new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, actual.getCrAC()[2].getCoeffs());
         assertArrayEquals(new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, actual.getCrAC()[3].getCoeffs());
 
-        assertEquals(new CoeffToken(2, 2), actual.getCoeffTokenCb()[0]);
-        assertEquals(new CoeffToken(3, 2), actual.getCoeffTokenCb()[1]);
-        assertEquals(new CoeffToken(1, 1), actual.getCoeffTokenCb()[2]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCb()[3]);
+        assertEquals(coeffToken(2, 2), actual.getCoeffTokenCb()[0]);
+        assertEquals(coeffToken(3, 2), actual.getCoeffTokenCb()[1]);
+        assertEquals(coeffToken(1, 1), actual.getCoeffTokenCb()[2]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCb()[3]);
 
-        assertEquals(new CoeffToken(7, 3), actual.getCoeffTokenCr()[0]);
-        assertEquals(new CoeffToken(3, 0), actual.getCoeffTokenCr()[1]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCr()[2]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCr()[3]);
+        assertEquals(coeffToken(7, 3), actual.getCoeffTokenCr()[0]);
+        assertEquals(coeffToken(3, 0), actual.getCoeffTokenCr()[1]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCr()[2]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCr()[3]);
     }
 
     public void testMiddleMB() throws Exception {
@@ -60,17 +61,17 @@ public class TestChroma extends JAVCTestCase {
 
         BitReader reader = new BitReader(ByteBuffer.wrap(BinUtil.binaryStringToBytes(bits)));
 
-        ChromaReader chromaReader = new ChromaReader(ChromaFormat.YUV_420, false);
+        ChromaReader chromaReader = new ChromaReader(YUV420, false);
 
         int codedBlockPattern = 47;
         int codedBlockPatternChroma = codedBlockPattern / 16;
 
-        MBlockNeighbourhood neighbourhood = new MBlockNeighbourhood(null, null, new CoeffToken[] {
-                new CoeffToken(0, 0), new CoeffToken(3, 3), new CoeffToken(0, 0), new CoeffToken(0, 0) },
-                new CoeffToken[] { new CoeffToken(0, 0), new CoeffToken(0, 0), new CoeffToken(0, 0),
-                        new CoeffToken(0, 0) }, new CoeffToken[] { new CoeffToken(5, 3), new CoeffToken(2, 2),
-                        new CoeffToken(0, 0), new CoeffToken(4, 2) }, new CoeffToken[] { new CoeffToken(0, 0),
-                        new CoeffToken(1, 1), new CoeffToken(1, 1), new CoeffToken(1, 1) }, null, null, true, true);
+        MBlockNeighbourhood neighbourhood = new MBlockNeighbourhood(null, null, new int[] {
+                coeffToken(0, 0), coeffToken(3, 3), coeffToken(0, 0), coeffToken(0, 0) },
+                new int[] { coeffToken(0, 0), coeffToken(0, 0), coeffToken(0, 0),
+                        coeffToken(0, 0) }, new int[] { coeffToken(5, 3), coeffToken(2, 2),
+                        coeffToken(0, 0), coeffToken(4, 2) }, new int[] { coeffToken(0, 0),
+                        coeffToken(1, 1), coeffToken(1, 1), coeffToken(1, 1) }, null, null, true, true);
 
         CodedChroma actual = chromaReader.readChroma(reader, codedBlockPatternChroma, neighbourhood);
 
@@ -87,15 +88,15 @@ public class TestChroma extends JAVCTestCase {
         assertArrayEquals(new int[] { 0, 3, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, actual.getCrAC()[2].getCoeffs());
         assertArrayEquals(new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, actual.getCrAC()[3].getCoeffs());
 
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCb()[0]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCb()[1]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCb()[2]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCb()[3]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCb()[0]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCb()[1]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCb()[2]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCb()[3]);
 
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCr()[0]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCr()[1]);
-        assertEquals(new CoeffToken(3, 2), actual.getCoeffTokenCr()[2]);
-        assertEquals(new CoeffToken(0, 0), actual.getCoeffTokenCr()[3]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCr()[0]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCr()[1]);
+        assertEquals(coeffToken(3, 2), actual.getCoeffTokenCr()[2]);
+        assertEquals(coeffToken(0, 0), actual.getCoeffTokenCr()[3]);
     }
 
 }

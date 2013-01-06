@@ -2,7 +2,6 @@ package org.jcodec.codecs.h264.io.read;
 
 import static org.jcodec.common.tools.Debug.trace;
 
-import org.jcodec.codecs.h264.io.BTree;
 import org.jcodec.common.io.BitReader;
 
 /**
@@ -89,21 +88,6 @@ public class CAVLCReader {
 
     public static int readME(BitReader bits, String string)  {
         return readUE(bits, string);
-    }
-
-    public static Object readCE(BitReader bits, BTree bt, String message)  {
-        while (true) {
-            int bit = bits.read1Bit();
-            bt = bt.down(bit);
-            if (bt == null) {
-                throw new RuntimeException("Illegal code");
-            }
-            Object i = bt.getValue();
-            if (i != null) {
-                trace(message, i.toString());
-                return i;
-            }
-        }
     }
 
     public static int readZeroBitCount(BitReader bits, String message)  {

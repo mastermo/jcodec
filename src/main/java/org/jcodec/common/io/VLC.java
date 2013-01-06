@@ -2,7 +2,6 @@ package org.jcodec.common.io;
 
 import gnu.trove.list.array.TIntArrayList;
 
-import java.io.IOException;
 import java.io.PrintStream;
 
 /**

@@ -1,9 +1,10 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import org.jcodec.codecs.h264.decode.ChromaIntraPredictionBuilder;
 import org.jcodec.codecs.h264.decode.model.BlockBorder;
 import org.jcodec.codecs.h264.decode.model.PixelBuffer;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 
 public class TestChromaPredictionBuilder extends JAVCTestCase {
 
@@ -41,7 +42,7 @@ public class TestChromaPredictionBuilder extends JAVCTestCase {
 		BlockBorder borderCb = new BlockBorder(leftCb, topCb, topLeftCb);
 		BlockBorder borderCr = new BlockBorder(leftCr, topCr, topLeftCr);
 
-		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, ChromaFormat.YUV_420);
+		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, YUV420);
 		int[] actualCb = new int[64];
 		int[] actualCr = new int[64];
 		builder.predictVertical(borderCb, new PixelBuffer(actualCb, 0, 3));
@@ -84,7 +85,7 @@ public class TestChromaPredictionBuilder extends JAVCTestCase {
 		BlockBorder borderCb = new BlockBorder(leftCb, topCb, topLeftCb);
 		BlockBorder borderCr = new BlockBorder(leftCr, topCr, topLeftCr);
 
-		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, ChromaFormat.YUV_420);
+		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, YUV420);
 		int[] actualCb = new int[64];
 		int[] actualCr = new int[64];
 		builder.predictHorizontal(borderCb, new PixelBuffer(actualCb, 0, 3));
@@ -179,7 +180,7 @@ public class TestChromaPredictionBuilder extends JAVCTestCase {
 		int[] topLeftCr = new int[] {131, 131, 131, 131};
 		BlockBorder border;
 
-		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, ChromaFormat.YUV_420);
+		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, YUV420);
 		int[] actual = new int[16];
 		
 		border = new BlockBorder(leftCb[0], topCb[0], topLeftCb[0]);
@@ -250,7 +251,7 @@ public class TestChromaPredictionBuilder extends JAVCTestCase {
 		BlockBorder borderCb = new BlockBorder(leftCb, topCb, topLeftCb);
 		BlockBorder borderCr = new BlockBorder(leftCr, topCr, topLeftCr);
 
-		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, ChromaFormat.YUV_420);
+		ChromaIntraPredictionBuilder builder = new ChromaIntraPredictionBuilder(8, YUV420);
 		int[] actualCb = new int[64];
 		int[] actualCr = new int[64];
 		builder.predictPlane(borderCb, new PixelBuffer(actualCb, 0, 3));

@@ -2,8 +2,8 @@ package org.jcodec.codecs.h264.io.read;
 
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
+import static org.jcodec.common.model.ColorSpace.MONO;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.Inter8x8Prediction;
 import org.jcodec.codecs.h264.io.model.InterPrediction;
 import org.jcodec.codecs.h264.io.model.MBPartPredMode;
@@ -16,6 +16,7 @@ import org.jcodec.codecs.h264.io.model.MBlockWithResidual;
 import org.jcodec.codecs.h264.io.model.SliceType;
 import org.jcodec.codecs.h264.io.model.SubMBType;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -29,7 +30,7 @@ import org.jcodec.common.io.BitReader;
 public class InterMBlockReader extends CodedMblockReader {
 
     private boolean transform8x8;
-    private ChromaFormat chromaFormat;
+    private ColorSpace chromaFormat;
     private boolean direct_8x8_inference_flag;
 
     private InterPredictionReader interPredictionReader;
@@ -42,7 +43,7 @@ public class InterMBlockReader extends CodedMblockReader {
     private static int[] coded_block_pattern_inter_monochrome = new int[] { 0, 1, 2, 4, 8, 3, 5, 10, 12, 15, 7, 11, 13,
             14, 6, 9 };
 
-    public InterMBlockReader(boolean transform8x8, ChromaFormat chromaFormat, boolean entropyCoding,
+    public InterMBlockReader(boolean transform8x8, ColorSpace chromaFormat, boolean entropyCoding,
             int numRefIdxL0Active, int numRefIdxL1Active, boolean direct_8x8_inference_flag) {
 
         super(chromaFormat, entropyCoding);
@@ -124,7 +125,7 @@ public class InterMBlockReader extends CodedMblockReader {
     }
 
     protected int[] getCodedBlockPatternMapping() {
-        if (chromaFormat == ChromaFormat.MONOCHROME) {
+        if (chromaFormat == MONO) {
             return coded_block_pattern_inter_monochrome;
         } else {
             return coded_block_pattern_inter_color;

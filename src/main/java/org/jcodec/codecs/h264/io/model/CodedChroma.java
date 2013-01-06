@@ -16,11 +16,11 @@ public class CodedChroma {
     private ResidualBlock[] cbAC;
     private ResidualBlock crDC;
     private ResidualBlock[] crAC;
-    private CoeffToken[] coeffTokenCb;
-    private CoeffToken[] coeffTokenCr;
+    private int[] coeffTokenCb;
+    private int[] coeffTokenCr;
 
     public CodedChroma(ResidualBlock cbDC, ResidualBlock[] cbAC, ResidualBlock crDC, ResidualBlock[] crAC,
-            CoeffToken[] coeffTokenCb, CoeffToken[] coeffTokenCr) {
+            int[] coeffTokenCb, int[] coeffTokenCr) {
         this.cbDC = cbDC;
         this.cbAC = cbAC;
         this.crDC = crDC;
@@ -45,11 +45,11 @@ public class CodedChroma {
         return crAC;
     }
 
-    public CoeffToken[] getCoeffTokenCb() {
+    public int[] getCoeffTokenCb() {
         return coeffTokenCb;
     }
 
-    public CoeffToken[] getCoeffTokenCr() {
+    public int[] getCoeffTokenCr() {
         return coeffTokenCr;
     }
 

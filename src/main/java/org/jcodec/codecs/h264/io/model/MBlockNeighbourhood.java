@@ -13,18 +13,17 @@ public class MBlockNeighbourhood {
     private boolean topAvailable;
     private boolean leftAvailable;
 
-    private CoeffToken[] lumaLeft;
-    private CoeffToken[] lumaTop;
-    private CoeffToken[] cbLeft;
-    private CoeffToken[] cbTop;
-    private CoeffToken[] crLeft;
-    private CoeffToken[] crTop;
+    private int[] lumaLeft;
+    private int[] lumaTop;
+    private int[] cbLeft;
+    private int[] cbTop;
+    private int[] crLeft;
+    private int[] crTop;
     private IntraNxNPrediction predLeft;
     private IntraNxNPrediction predTop;
 
-    public MBlockNeighbourhood(CoeffToken[] lumaLeft, CoeffToken[] lumaTop, CoeffToken[] cbLeft, CoeffToken[] cbTop,
-            CoeffToken[] crLeft, CoeffToken[] crTop, IntraNxNPrediction predLeft, IntraNxNPrediction predTop,
-            boolean leftAvailable, boolean topAvailable) {
+    public MBlockNeighbourhood(int[] lumaLeft, int[] lumaTop, int[] cbLeft, int[] cbTop, int[] crLeft, int[] crTop,
+            IntraNxNPrediction predLeft, IntraNxNPrediction predTop, boolean leftAvailable, boolean topAvailable) {
         this.lumaLeft = lumaLeft;
         this.lumaTop = lumaTop;
 
@@ -41,27 +40,27 @@ public class MBlockNeighbourhood {
         this.leftAvailable = leftAvailable;
     }
 
-    public CoeffToken[] getLumaLeft() {
+    public int[] getLumaLeft() {
         return lumaLeft;
     }
 
-    public CoeffToken[] getLumaTop() {
+    public int[] getLumaTop() {
         return lumaTop;
     }
 
-    public CoeffToken[] getCbLeft() {
+    public int[] getCbLeft() {
         return cbLeft;
     }
 
-    public CoeffToken[] getCbTop() {
+    public int[] getCbTop() {
         return cbTop;
     }
 
-    public CoeffToken[] getCrLeft() {
+    public int[] getCrLeft() {
         return crLeft;
     }
 
-    public CoeffToken[] getCrTop() {
+    public int[] getCrTop() {
         return crTop;
     }
 

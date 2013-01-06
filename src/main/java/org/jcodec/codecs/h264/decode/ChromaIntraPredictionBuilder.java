@@ -2,7 +2,7 @@ package org.jcodec.codecs.h264.decode;
 
 import org.jcodec.codecs.h264.decode.model.BlockBorder;
 import org.jcodec.codecs.h264.decode.model.PixelBuffer;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -15,9 +15,9 @@ import org.jcodec.codecs.h264.io.model.ChromaFormat;
  */
 public class ChromaIntraPredictionBuilder {
     private int bitDepthLuma;
-    private ChromaFormat chromaFormat;
+    private ColorSpace chromaFormat;
 
-    public ChromaIntraPredictionBuilder(int bitDepthLuma, ChromaFormat chromaFormat) {
+    public ChromaIntraPredictionBuilder(int bitDepthLuma, ColorSpace chromaFormat) {
         this.bitDepthLuma = bitDepthLuma;
         this.chromaFormat = chromaFormat;
     }

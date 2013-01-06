@@ -5,13 +5,13 @@ import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
 import org.jcodec.codecs.h264.decode.model.MVMatrix;
 import org.jcodec.codecs.h264.decode.model.NearbyMotionVectors;
 import org.jcodec.codecs.h264.decode.model.PixelBuffer;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.Inter8x8Prediction;
 import org.jcodec.codecs.h264.io.model.MBlockInter;
 import org.jcodec.codecs.h264.io.model.MBlockInter8x8;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 import org.jcodec.codecs.h264.io.model.SubMBType;
 import org.jcodec.codecs.h264.io.model.Vector;
+import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.model.Point;
 
@@ -35,7 +35,7 @@ public class MBlockDecoderInter {
         predictionBuilder = new InterPredictionBuilder();
         transform = new CoeffTransformer(null);
         mvPredictor = new MVPredictor();
-        chromaDecoder = new ChromaDecoder(chromaQpOffset, 8, ChromaFormat.YUV_420);
+        chromaDecoder = new ChromaDecoder(chromaQpOffset, 8, ColorSpace.YUV420);
     }
 
     public DecodedMBlock decodeP8x8(Picture[] reference, MBlockInter8x8 mb, NearbyMotionVectors nearMV, Point origin,

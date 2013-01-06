@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -253,5 +255,17 @@ public class NIOUtils {
         ByteBuffer buf = ByteBuffer.allocate(4);
         channel.read(buf);
         return buf.getInt();
+    }
+
+    public static void writeByte(WritableByteChannel channel, byte value) throws IOException {
+        channel.write((ByteBuffer) ByteBuffer.allocate(1).put(value).flip());
+    }
+
+    public static void writeInt(WritableByteChannel channel, int value) throws IOException {
+        channel.write((ByteBuffer) ByteBuffer.allocate(4).putInt(value).flip());
+    }
+
+    public static void writeLong(WritableByteChannel channel, long value) throws IOException {
+        channel.write((ByteBuffer) ByteBuffer.allocate(8).putLong(value).flip());
     }
 }

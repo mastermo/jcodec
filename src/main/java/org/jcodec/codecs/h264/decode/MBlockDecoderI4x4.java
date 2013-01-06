@@ -5,10 +5,10 @@ import org.jcodec.codecs.h264.decode.model.DecodedChroma;
 import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
 import org.jcodec.codecs.h264.decode.model.NearbyPixels;
 import org.jcodec.codecs.h264.decode.model.PixelBuffer;
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.IntraNxNPrediction;
 import org.jcodec.codecs.h264.io.model.MBlockIntraNxN;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -52,7 +52,7 @@ public class MBlockDecoderI4x4 {
     public MBlockDecoderI4x4(int[] chromaQpOffset, int bitDepthLuma, int bitDepthChroma) {
         transform = new CoeffTransformer(null);
         intraPredictionBuilder = new Intra4x4PredictionBuilder(bitDepthLuma);
-        chromaDecoder = new ChromaDecoder(chromaQpOffset, bitDepthChroma, ChromaFormat.YUV_420);
+        chromaDecoder = new ChromaDecoder(chromaQpOffset, bitDepthChroma, ColorSpace.YUV420);
     }
 
     public DecodedMBlock decodeINxN(MBlockIntraNxN coded, int qp, NearbyPixels nearPixels) {

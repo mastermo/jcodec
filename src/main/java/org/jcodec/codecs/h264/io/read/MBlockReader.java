@@ -1,6 +1,5 @@
 package org.jcodec.codecs.h264.io.read;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBPartPredMode;
 import org.jcodec.codecs.h264.io.model.MBlockInter;
 import org.jcodec.codecs.h264.io.model.MBlockIntra16x16;
@@ -8,6 +7,7 @@ import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.Macroblock;
 import org.jcodec.codecs.h264.io.model.SliceType;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -25,7 +25,7 @@ public class MBlockReader {
     private InterMBlockReader interMBlockReader;
     private IPCMMblockReader ipcmMblockReader;
 
-    public MBlockReader(boolean transform8x8, ChromaFormat chromaFormat, boolean entropyCoding, int bitDepthLuma,
+    public MBlockReader(boolean transform8x8, ColorSpace chromaFormat, boolean entropyCoding, int bitDepthLuma,
             int bitDepthChroma, int numRefIdxL0Active, int numRefIdxL1Active, boolean direct_8x8_inference_flag) {
         intraMBlockReader = new IntraMBlockReader(transform8x8, chromaFormat, entropyCoding);
         interMBlockReader = new InterMBlockReader(transform8x8, chromaFormat, entropyCoding, numRefIdxL0Active,

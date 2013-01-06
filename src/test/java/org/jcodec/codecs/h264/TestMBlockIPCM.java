@@ -1,8 +1,9 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.common.model.ColorSpace.YUV420;
+
 import java.nio.ByteBuffer;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
 import org.jcodec.codecs.h264.io.model.MBlockIPCM;
 import org.jcodec.codecs.h264.io.read.IPCMMblockReader;
 import org.jcodec.codecs.util.BinUtil;
@@ -59,7 +60,7 @@ public class TestMBlockIPCM extends JAVCTestCase {
 				.binaryStringToBytes(bits)));
 
 		IPCMMblockReader mblockReader = new IPCMMblockReader(
-				ChromaFormat.YUV_420, 8, 8);
+				YUV420, 8, 8);
 
 		MBlockIPCM mblock = mblockReader.readMBlockIPCM(reader);
 

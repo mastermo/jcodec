@@ -2,13 +2,15 @@ package org.jcodec.codecs.h264.io.read;
 
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
 
-import org.jcodec.codecs.h264.io.model.ChromaFormat;
+import org.jcodec.codecs.h264.H264Const;
+import org.jcodec.codecs.h264.io.CAVLC;
 import org.jcodec.codecs.h264.io.model.CodedChroma;
-import org.jcodec.codecs.h264.io.model.CoeffToken;
 import org.jcodec.codecs.h264.io.model.MBlockNeighbourhood;
 import org.jcodec.codecs.h264.io.model.MBlockWithResidual;
 import org.jcodec.codecs.h264.io.model.ResidualBlock;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.io.VLC;
+import org.jcodec.common.model.ColorSpace;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -23,25 +25,21 @@ public abstract class CodedMblockReader {
 
     protected boolean entropyCoding;
 
-    private ResidualCoeffsCAVLCReader cavlcReader;
-    private CoeffTokenReader coeffTokenReader;
-    private ResidualCoeffsCABACReader cabacReader;
+    private CAVLC cavlcReader;
     private ChromaReader chromaReader;
 
     static int[] mappingTop4x4 = { 20, 21, 0, 1, 22, 23, 4, 5, 2, 3, 8, 9, 6, 7, 12, 13 };
     static int[] mappingLeft4x4 = { 16, 0, 17, 2, 1, 4, 3, 6, 18, 8, 19, 10, 9, 12, 11, 14 };
 
-    public CodedMblockReader(ChromaFormat chromaFormat, boolean entropyCoding) {
+    public CodedMblockReader(ColorSpace chromaFormat, boolean entropyCoding) {
         this.entropyCoding = entropyCoding;
 
-        coeffTokenReader = new CoeffTokenReader(chromaFormat);
-        cavlcReader = new ResidualCoeffsCAVLCReader(chromaFormat);
-        cabacReader = new ResidualCoeffsCABACReader();
+        cavlcReader = new CAVLC(chromaFormat);
         chromaReader = new ChromaReader(chromaFormat, entropyCoding);
     }
 
     public MBlockWithResidual readMBlockWithResidual(BitReader in, MBlockNeighbourhood neighbourhood,
-            int codedBlockPattern, boolean transform8x8Used)  {
+            int codedBlockPattern, boolean transform8x8Used) {
         int codedBlockPatternLuma = codedBlockPattern % 16;
         int codedBlockPatternChroma = codedBlockPattern / 16;
 
@@ -59,17 +57,10 @@ public abstract class CodedMblockReader {
     }
 
     private BlocksWithTokens readLumaNxN(BitReader reader, MBlockNeighbourhood neighbourhood, boolean transform8x8Used,
-            int codedBlockPatternLuma)  {
+            int codedBlockPatternLuma) {
 
         if (entropyCoding) {
-            ResidualBlock[] lumaBlock;
-            if (transform8x8Used) {
-                lumaBlock = readResidualLuma8x8Cabac(reader, codedBlockPatternLuma);
-            } else {
-                lumaBlock = readResidualLuma4x4Cabac(reader, codedBlockPatternLuma);
-            }
-            return new BlocksWithTokens(lumaBlock, null);
-
+            throw new RuntimeException("CABAC!");
         } else {
             BlocksWithTokens luma;
             if (transform8x8Used) {
@@ -81,8 +72,7 @@ public abstract class CodedMblockReader {
         }
     }
 
-    protected BlocksWithTokens readResidualLuma8x8(BitReader reader, MBlockNeighbourhood neighbourhood, int pattern)
-             {
+    protected BlocksWithTokens readResidualLuma8x8(BitReader reader, MBlockNeighbourhood neighbourhood, int pattern) {
 
         BlocksWithTokens luma4x4 = readResidualLuma4x4(reader, neighbourhood, pattern);
 
@@ -107,14 +97,13 @@ public abstract class CodedMblockReader {
         return luma4x4;
     }
 
-    protected BlocksWithTokens readResidualLuma4x4(BitReader reader, MBlockNeighbourhood neighbourhood, int pattern)
-             {
+    protected BlocksWithTokens readResidualLuma4x4(BitReader reader, MBlockNeighbourhood neighbourhood, int pattern) {
         ResidualBlock[] lumaLevel = new ResidualBlock[16];
 
-        CoeffToken[] lumaLeft = neighbourhood.getLumaLeft();
-        CoeffToken[] lumaTop = neighbourhood.getLumaTop();
+        int[] lumaLeft = neighbourhood.getLumaLeft();
+        int[] lumaTop = neighbourhood.getLumaTop();
 
-        CoeffToken[] pred = new CoeffToken[24];
+        int[] pred = new int[24];
         pred[16] = lumaLeft != null ? lumaLeft[5] : null;
         pred[17] = lumaLeft != null ? lumaLeft[7] : null;
         pred[18] = lumaLeft != null ? lumaLeft[13] : null;
@@ -124,55 +113,32 @@ public abstract class CodedMblockReader {
         pred[22] = lumaTop != null ? lumaTop[14] : null;
         pred[23] = lumaTop != null ? lumaTop[15] : null;
 
-        CoeffToken[] tokens = new CoeffToken[16];
+        int[] tokens = new int[16];
+
+        boolean[] leftAvailable = new boolean[] { neighbourhood.isLeftAvailable(), true,
+                neighbourhood.isLeftAvailable(), true, true, true, true, true, neighbourhood.isLeftAvailable(), true,
+                neighbourhood.isLeftAvailable(), true, true, true, true, true };
+        boolean[] topAvailable = new boolean[] { neighbourhood.isLeftAvailable(), neighbourhood.isLeftAvailable(),
+                true, true, neighbourhood.isLeftAvailable(), neighbourhood.isLeftAvailable(), true, true, true, true,
+                true, true, true, true, true, true };
 
         for (int i8x8 = 0; i8x8 < 4; i8x8++) {
-            for (int i4x4 = 0; i4x4 < 4; i4x4++) {
-                int blkAddr = i8x8 * 4 + i4x4;
-                if ((pattern & (1 << i8x8)) > 0) {
-                    CoeffToken coeffToken = coeffTokenReader.read(reader, pred[mappingLeft4x4[blkAddr]],
-                            pred[mappingTop4x4[blkAddr]]);
+            if ((pattern & (1 << i8x8)) != 0) {
+                for (int i4x4 = 0; i4x4 < 4; i4x4++) {
+                    int blkAddr = i8x8 * 4 + i4x4;
 
-                    lumaLevel[blkAddr] = new ResidualBlock(cavlcReader.readCoeffs(reader,
-                            ResidualBlock.BlockType.BLOCK_LUMA_4x4, coeffToken));
+                    VLC coeffTokenTable = cavlcReader.getCoeffTokenVLCForLuma(leftAvailable[blkAddr],
+                            pred[mappingLeft4x4[blkAddr]], topAvailable[blkAddr], pred[mappingTop4x4[blkAddr]]);
 
-                    pred[blkAddr] = coeffToken;
-                    tokens[blkAddr] = coeffToken;
-                } else {
-                    pred[blkAddr] = new CoeffToken(0, 0);
-                    tokens[blkAddr] = pred[blkAddr];
+                    int[] coeff = new int[16];
+                    int readCoeffs = cavlcReader.readCoeffs(reader, coeffTokenTable, H264Const.totalZeros16, coeff);
+                    lumaLevel[blkAddr] = new ResidualBlock(coeff);
+                    pred[blkAddr] = readCoeffs;
+                    tokens[blkAddr] = readCoeffs;
                 }
             }
         }
 
         return new BlocksWithTokens(lumaLevel, tokens);
-    }
-
-    protected ResidualBlock[] readResidualLuma4x4Cabac(BitReader reader, int pattern)  {
-
-        ResidualBlock[] lumaLevel = new ResidualBlock[16];
-
-        for (int i8x8 = 0; i8x8 < 4; i8x8++) {
-            for (int i4x4 = 0; i4x4 < 4; i4x4++) {
-                if ((pattern & (1 << i8x8)) > 0) {
-                    lumaLevel[i8x8 * 4 + i4x4] = new ResidualBlock(cabacReader.readCoeffs(reader));
-                }
-            }
-        }
-
-        return lumaLevel;
-    }
-
-    protected ResidualBlock[] readResidualLuma8x8Cabac(BitReader reader, int pattern)  {
-
-        ResidualBlock[] lumaLevel8x8 = new ResidualBlock[4];
-
-        for (int i8x8 = 0; i8x8 < 4; i8x8++) {
-            if ((pattern & (1 << i8x8)) > 0) {
-                lumaLevel8x8[i8x8] = new ResidualBlock(cabacReader.readCoeffs(reader));
-            }
-        }
-
-        return lumaLevel8x8;
     }
 }

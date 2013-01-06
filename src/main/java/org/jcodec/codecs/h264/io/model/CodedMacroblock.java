@@ -14,9 +14,9 @@ public abstract class CodedMacroblock extends Macroblock {
     private int qpDelta;
     private CodedChroma chroma;
     private int cbpChroma;
-    private CoeffToken[] lumaTokens;
+    private int[] lumaTokens;
 
-    public CodedMacroblock(int qpDelta, CodedChroma chroma, CoeffToken[] lumaTokens) {
+    public CodedMacroblock(int qpDelta, CodedChroma chroma, int[] lumaTokens) {
         this.qpDelta = qpDelta;
         this.chroma = chroma;
         this.lumaTokens = lumaTokens;
@@ -36,7 +36,7 @@ public abstract class CodedMacroblock extends Macroblock {
         return chroma;
     }
 
-    public CoeffToken[] getLumaTokens() {
+    public int[] getLumaTokens() {
         return lumaTokens;
     }
 
