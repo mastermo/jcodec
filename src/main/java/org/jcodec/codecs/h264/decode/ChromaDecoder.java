@@ -33,7 +33,7 @@ public class ChromaDecoder {
 
     public ChromaDecoder(int[] chromaQpOffset, int bitDepthChroma, ColorSpace chromaFormat) {
         transform = new CoeffTransformer(null);
-        intraPredictionBuilder = new ChromaIntraPredictionBuilder(bitDepthChroma, chromaFormat);
+        intraPredictionBuilder = new ChromaIntraPredictionBuilder(bitDepthChroma);
         interPredictionBuilder = new ChromaInterPredictionBuilder();
 
         this.chromaQpOffset = chromaQpOffset;
@@ -103,12 +103,11 @@ public class ChromaDecoder {
         int[] residual = new int[64];
 
         // DC
-        int[] dc;
+        int[] dc = new int[4];
         if (dcBlk != null) {
-            int[] transformed = transform.transformIHadamard2x2(dcBlk.getCoeffs());
-            dc = transform.rescaleAfterIHadamard2x2(transformed, qp);
-        } else {
-            dc = new int[4];
+            System.arraycopy(dcBlk.getCoeffs(), 0, dc, 0, 4);
+            transform.invDC2x2(dc);
+            transform.dequantizeDC2x2(dc, qp);
         }
 
         // AC
@@ -119,15 +118,15 @@ public class ChromaDecoder {
             if (block != null) {
                 int[] coeffs = new int[16];
                 System.arraycopy(block.getCoeffs(), 0, coeffs, 1, 15);
-                int[] reordered = transform.reorderCoeffs(coeffs);
-                rescaled = transform.rescaleBeforeIDCT4x4(reordered, qp);
+                rescaled = transform.unzigzagAC(coeffs);
+                transform.dequantizeAC(rescaled, qp);
             } else {
                 rescaled = new int[16];
             }
 
             rescaled[0] = dc[i4x4];
-            int[] transformed = transform.transformIDCT4x4(rescaled);
-            PixelBuffer pt = new PixelBuffer(transformed, 0, 2);
+            transform.idct4x4(rescaled);
+            PixelBuffer pt = new PixelBuffer(rescaled, 0, 2);
 
             int pelY = (i4x4 / 2) * 4 * 8;
             int pelX = (i4x4 % 2) * 4;

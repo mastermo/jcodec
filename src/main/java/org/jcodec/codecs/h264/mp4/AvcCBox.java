@@ -21,6 +21,10 @@ import org.jcodec.containers.mp4.boxes.Header;
  */
 public class AvcCBox extends Box {
 
+    private int profile;
+    private int profileCompat;
+    private int level;
+
     private List<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
     private List<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
 
@@ -36,8 +40,11 @@ public class AvcCBox extends Box {
         super(header);
     }
 
-    public AvcCBox(List<ByteBuffer> spsList, List<ByteBuffer> ppsList) {
+    public AvcCBox(int profile, int profileCompat, int level, List<ByteBuffer> spsList, List<ByteBuffer> ppsList) {
         this();
+        this.profile = profile;
+        this.profileCompat = profileCompat;
+        this.level = level;
         this.spsList = spsList;
         this.ppsList = ppsList;
     }
@@ -48,7 +55,11 @@ public class AvcCBox extends Box {
 
     @Override
     public void parse(ByteBuffer input) {
-        NIOUtils.skip(input, 5);
+        NIOUtils.skip(input, 1);
+        profile = input.get() & 0xff;
+        profileCompat = input.get() & 0xff;
+        level = input.get() & 0xff;
+        NIOUtils.skip(input, 1);
 
         int nSPS = input.get() & 0x1f; // 3 bits reserved + 5 bits number of
                                        // sps
@@ -68,10 +79,11 @@ public class AvcCBox extends Box {
 
     @Override
     protected void doWrite(ByteBuffer out) {
-        out.put((byte) 0x1);
-        out.put((byte) 0x64);
-        out.put((byte) 0x0);
-        out.put((byte) 0x1e);
+
+        out.put((byte) 0x1); // version
+        out.put((byte) profile);
+        out.put((byte) profileCompat);
+        out.put((byte) level);
         out.put((byte) 0xff);
 
         out.put((byte) (spsList.size() | 0xe0));

@@ -38,11 +38,11 @@ public class MBlockDecoderI16x16 {
         int[] pixelsLuma = predict16x16(coded.getLumaMode(), nearPixels.getLuma());
 
         // DC
-        int[] reorderedDC = transform.reorderCoeffs(coded.getLumaDC().getCoeffs());
-        int[] transformedDC = transform.transformIHadamard4x4(reorderedDC);
-        int[] dco = transform.rescaleAfterIHadamard4x4(transformedDC, qp);
-        int[] dc = new int[] { dco[0], dco[1], dco[4], dco[5], dco[2], dco[3], dco[6], dco[7], dco[8], dco[9], dco[12],
-                dco[13], dco[10], dco[11], dco[14], dco[15] };
+        int[] rdc = transform.unzigzagAC(coded.getLumaDC().getCoeffs());
+        transform.invDC4x4(rdc);
+        transform.dequantizeDC4x4(rdc, qp);
+        int[] dc = new int[] { rdc[0], rdc[1], rdc[4], rdc[5], rdc[2], rdc[3], rdc[6], rdc[7], rdc[8], rdc[9], rdc[12],
+                rdc[13], rdc[10], rdc[11], rdc[14], rdc[15] };
 
         // AC
 
@@ -58,15 +58,15 @@ public class MBlockDecoderI16x16 {
                     coeffs[0] = 0;
                     System.arraycopy(block.getCoeffs(), 0, coeffs, 1, 15);
 
-                    int[] reordered = transform.reorderCoeffs(coeffs);
-                    rescaled = transform.rescaleBeforeIDCT4x4(reordered, qp);
+                    rescaled = transform.unzigzagAC(coeffs);
+                    transform.dequantizeAC(rescaled, qp);
                 } else {
                     rescaled = new int[16];
                 }
                 rescaled[0] = dc[(i8x8 << 2) + i4x4];
-                int[] transformed = transform.transformIDCT4x4(rescaled);
+                transform.idct4x4(rescaled);
 
-                PixelBuffer pt = new PixelBuffer(transformed, 0, 2);
+                PixelBuffer pt = new PixelBuffer(rescaled, 0, 2);
 
                 int pelY = (i8x8 / 2) * 8 * 16 + (i4x4 / 2) * 4 * 16;
                 int pelX = (i8x8 % 2) * 8 + (i4x4 % 2) * 4;

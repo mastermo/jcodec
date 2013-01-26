@@ -50,7 +50,7 @@ public class MathUtil {
 
         return n;
     }
-    
+
     public static int log2(long v) {
         int n = 0;
         if ((v & 0xffffffff00000000L) != 0) {
@@ -65,7 +65,7 @@ public class MathUtil {
             v >>= 8;
             n += 8;
         }
-        n += logTab[(int)v];
+        n += logTab[(int) v];
 
         return n;
     }
@@ -103,7 +103,7 @@ public class MathUtil {
     public static final int reverse(int b) {
         return reverseTab[b & 0xff];
     }
-    
+
     public static int nextPowerOfTwo(int n) {
         n = n - 1;
         n = n | (n >> 1);
@@ -114,13 +114,15 @@ public class MathUtil {
         n = n + 1;
         return n;
     }
-    
+
     public static final int abs(int val) {
         int sign = (val >> 31);
         return (val ^ sign) - sign;
     }
-    
+
     public static final int golomb(int signedLevel) {
-        return (abs(signedLevel) << 1) + (signedLevel >>> 31);
+        if (signedLevel == 0)
+            return 0;
+        return (abs(signedLevel) << 1) - (~signedLevel >>> 31);
     }
 }

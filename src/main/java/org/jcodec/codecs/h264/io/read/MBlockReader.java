@@ -161,57 +161,8 @@ public class MBlockReader {
 
     public MBlockIntra16x16 readMBlockIntra16x16(BitReader reader, int mbType, MBlockNeighbourhood neighbourhood)
              {
-        switch (mbType) {
-        case 1:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 0, 0);
-        case 2:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 0, 0);
-        case 3:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 2, 0, 0);
-        case 4:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 3, 0, 0);
-        case 5:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 1, 0);
-        case 6:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 1, 0);
-        case 7:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 2, 1, 0);
-        case 8:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 3, 1, 0);
-        case 9:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 2, 0);
-        case 10:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 2, 0);
-        case 11:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 2, 2, 0);
-        case 12:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 3, 2, 0);
-        case 13:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 0, 15);
-        case 14:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 0, 15);
-        case 15:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 2, 0, 15);
-        case 16:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 3, 0, 15);
-        case 17:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 1, 15);
-        case 18:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 1, 15);
-        case 19:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 2, 1, 15);
-        case 20:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 3, 1, 15);
-        case 21:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 0, 2, 15);
-        case 22:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 1, 2, 15);
-        case 23:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 2, 2, 15);
-        case 24:
-            return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, 3, 2, 15);
-        }
-
-        return null;
+        mbType --;
+        
+        return intraMBlockReader.readMBlockIntra16x16(reader, neighbourhood, mbType % 4, (mbType / 4) % 3, (mbType / 12) * 15);
     }
 }

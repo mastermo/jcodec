@@ -354,72 +354,72 @@ public class H264Const {
 
     public static VLC[] totalZeros16 = {
 
-            new VLCBuilder().set(0, "1").set(0, "011").set(0, "010").set(0, "0011").set(0, "0010").set(0, "00011")
-                    .set(0, "00010").set(0, "000011").set(0, "000010").set(0, "0000011").set(0, "0000010")
-                    .set(0, "00000011").set(0, "00000010").set(0, "000000011").set(0, "000000010").set(0, "000000001")
+            new VLCBuilder().set(0, "1").set(1, "011").set(2, "010").set(3, "0011").set(4, "0010").set(5, "00011")
+                    .set(6, "00010").set(7, "000011").set(8, "000010").set(9, "0000011").set(10, "0000010")
+                    .set(11, "00000011").set(12, "00000010").set(13, "000000011").set(14, "000000010").set(15, "000000001")
                     .getVLC(),
 
-            new VLCBuilder().set(0, "111").set(0, "110").set(0, "101").set(0, "100").set(0, "011").set(0, "0101")
-                    .set(0, "0100").set(0, "0011").set(0, "0010").set(0, "00011").set(0, "00010").set(0, "000011")
-                    .set(0, "000010").set(0, "000001").set(0, "000000").getVLC(),
+            new VLCBuilder().set(0, "111").set(1, "110").set(2, "101").set(3, "100").set(4, "011").set(5, "0101")
+                    .set(6, "0100").set(7, "0011").set(8, "0010").set(9, "00011").set(10, "00010").set(11, "000011")
+                    .set(12, "000010").set(13, "000001").set(14, "000000").getVLC(),
 
-            new VLCBuilder().set(0, "0101").set(0, "111").set(0, "110").set(0, "101").set(0, "0100").set(0, "0011")
-                    .set(0, "100").set(0, "011").set(0, "0010").set(0, "00011").set(0, "00010").set(0, "000001")
-                    .set(0, "00001").set(0, "000000").getVLC(),
+            new VLCBuilder().set(0, "0101").set(1, "111").set(2, "110").set(3, "101").set(4, "0100").set(5, "0011")
+                    .set(6, "100").set(7, "011").set(8, "0010").set(9, "00011").set(10, "00010").set(11, "000001")
+                    .set(12, "00001").set(13, "000000").getVLC(),
 
-            new VLCBuilder().set(0, "00011").set(0, "111").set(0, "0101").set(0, "0100").set(0, "110").set(0, "101")
-                    .set(0, "100").set(0, "0011").set(0, "011").set(0, "0010").set(0, "00010").set(0, "00001")
-                    .set(0, "00000").getVLC(),
+            new VLCBuilder().set(0, "00011").set(1, "111").set(2, "0101").set(3, "0100").set(4, "110").set(5, "101")
+                    .set(6, "100").set(7, "0011").set(8, "011").set(9, "0010").set(10, "00010").set(11, "00001")
+                    .set(12, "00000").getVLC(),
 
-            new VLCBuilder().set(0, "0101").set(0, "0100").set(0, "0011").set(0, "111").set(0, "110").set(0, "101")
-                    .set(0, "100").set(0, "011").set(0, "0010").set(0, "00001").set(0, "0001").set(0, "00000").getVLC(),
+            new VLCBuilder().set(0, "0101").set(1, "0100").set(2, "0011").set(3, "111").set(4, "110").set(5, "101")
+                    .set(6, "100").set(7, "011").set(8, "0010").set(9, "00001").set(10, "0001").set(11, "00000").getVLC(),
 
-            new VLCBuilder().set(0, "000001").set(0, "00001").set(0, "111").set(0, "110").set(0, "101").set(0, "100")
-                    .set(0, "011").set(0, "010").set(0, "0001").set(0, "001").set(0, "000000").getVLC(),
+            new VLCBuilder().set(0, "000001").set(1, "00001").set(2, "111").set(3, "110").set(4, "101").set(5, "100")
+                    .set(6, "011").set(7, "010").set(8, "0001").set(9, "001").set(10, "000000").getVLC(),
 
-            new VLCBuilder().set(0, "000001").set(0, "00001").set(0, "101").set(0, "100").set(0, "011").set(0, "11")
-                    .set(0, "010").set(0, "0001").set(0, "001").set(0, "000000").getVLC(),
+            new VLCBuilder().set(0, "000001").set(1, "00001").set(2, "101").set(3, "100").set(4, "011").set(5, "11")
+                    .set(6, "010").set(7, "0001").set(8, "001").set(9, "000000").getVLC(),
 
-            new VLCBuilder().set(0, "000001").set(0, "0001").set(0, "00001").set(0, "011").set(0, "11").set(0, "10")
-                    .set(0, "010").set(0, "001").set(0, "000000").getVLC(),
+            new VLCBuilder().set(0, "000001").set(1, "0001").set(2, "00001").set(3, "011").set(4, "11").set(5, "10")
+                    .set(6, "010").set(7, "001").set(8, "000000").getVLC(),
 
-            new VLCBuilder().set(0, "000001").set(0, "000000").set(0, "0001").set(0, "11").set(0, "10").set(0, "001")
-                    .set(0, "01").set(0, "00001").getVLC(),
+            new VLCBuilder().set(0, "000001").set(1, "000000").set(2, "0001").set(3, "11").set(4, "10").set(5, "001")
+                    .set(6, "01").set(7, "00001").getVLC(),
 
-            new VLCBuilder().set(0, "00001").set(0, "00000").set(0, "001").set(0, "11").set(0, "10").set(0, "01")
-                    .set(0, "0001").getVLC(),
+            new VLCBuilder().set(0, "00001").set(1, "00000").set(2, "001").set(3, "11").set(4, "10").set(5, "01")
+                    .set(6, "0001").getVLC(),
 
-            new VLCBuilder().set(0, "0000").set(0, "0001").set(0, "001").set(0, "010").set(0, "1").set(0, "011")
+            new VLCBuilder().set(0, "0000").set(1, "0001").set(2, "001").set(3, "010").set(4, "1").set(5, "011")
                     .getVLC(),
 
-            new VLCBuilder().set(0, "0000").set(0, "0001").set(0, "01").set(0, "1").set(0, "001").getVLC(),
+            new VLCBuilder().set(0, "0000").set(1, "0001").set(2, "01").set(3, "1").set(4, "001").getVLC(),
 
-            new VLCBuilder().set(0, "000").set(0, "001").set(0, "1").set(0, "01").getVLC(),
+            new VLCBuilder().set(0, "000").set(1, "001").set(2, "1").set(3, "01").getVLC(),
 
-            new VLCBuilder().set(0, "00").set(0, "01").set(0, "1").getVLC(),
+            new VLCBuilder().set(0, "00").set(1, "01").set(2, "1").getVLC(),
 
-            new VLCBuilder().set(0, "0").set(0, "1").getVLC() };
+            new VLCBuilder().set(0, "0").set(1, "1").getVLC() };
 
-    public static VLC[] totalZeros4 = { new VLCBuilder().set(0, "1").set(0, "01").set(0, "001").set(0, "000").getVLC(),
+    public static VLC[] totalZeros4 = { new VLCBuilder().set(0, "1").set(1, "01").set(2, "001").set(3, "000").getVLC(),
 
-    new VLCBuilder().set(0, "1").set(0, "01").set(0, "00").getVLC(),
+    new VLCBuilder().set(0, "1").set(1, "01").set(2, "00").getVLC(),
 
-    new VLCBuilder().set(0, "1").set(0, "0").getVLC() };
+    new VLCBuilder().set(0, "1").set(1, "0").getVLC() };
 
     public static VLC[] totalZeros8 = {
-            new VLCBuilder().set(0, "1").set(0, "010").set(0, "011").set(0, "0010").set(0, "0011").set(0, "0001")
-                    .set(0, "00001").set(0, "00000").getVLC(),
+            new VLCBuilder().set(0, "1").set(1, "010").set(2, "011").set(3, "0010").set(4, "0011").set(5, "0001")
+                    .set(6, "00001").set(7, "00000").getVLC(),
 
-            new VLCBuilder().set(0, "000").set(0, "01").set(0, "001").set(0, "100").set(0, "101").set(0, "110")
-                    .set(0, "111").getVLC(),
+            new VLCBuilder().set(0, "000").set(1, "01").set(2, "001").set(3, "100").set(4, "101").set(5, "110")
+                    .set(6, "111").getVLC(),
 
-            new VLCBuilder().set(0, "000").set(0, "001").set(0, "01").set(0, "10").set(0, "110").set(0, "111").getVLC(),
+            new VLCBuilder().set(0, "000").set(1, "001").set(2, "01").set(3, "10").set(4, "110").set(5, "111").getVLC(),
 
-            new VLCBuilder().set(0, "110").set(0, "00").set(0, "01").set(0, "10").set(0, "111").getVLC(),
+            new VLCBuilder().set(0, "110").set(1, "00").set(2, "01").set(3, "10").set(4, "111").getVLC(),
 
-            new VLCBuilder().set(0, "00").set(0, "01").set(0, "10").set(0, "11").getVLC(),
+            new VLCBuilder().set(0, "00").set(1, "01").set(2, "10").set(3, "11").getVLC(),
 
-            new VLCBuilder().set(0, "00").set(0, "01").set(0, "1").getVLC(),
+            new VLCBuilder().set(0, "00").set(1, "01").set(2, "1").getVLC(),
 
-            new VLCBuilder().set(0, "0").set(0, "1").getVLC() };
+            new VLCBuilder().set(0, "0").set(1, "1").getVLC() };
 }

@@ -29,7 +29,7 @@ public class BitWriter {
         }
     }
 
-    public void putInt(int i) {
+    private final void putInt(int i) {
         os.put((byte) (i >>> 24));
         os.put((byte) (i >> 16));
         os.put((byte) (i >> 8));
@@ -39,19 +39,24 @@ public class BitWriter {
     public final void writeNBit(int value, int n) {
         if (n > 32)
             throw new IllegalArgumentException("Max 32 bit to write");
+        if (n == 0)
+            return;
+//        for (int i = n - 1; i >= 0; i--)
+//            System.out.print((value >> i) & 0x1);
+//        System.out.println();
         value &= -1 >>> (32 - n);
         if (32 - curBit >= n) {
             curInt |= value << (32 - curBit - n);
             curBit += n;
             if (curBit == 32) {
-                os.putInt(curInt);
+                putInt(curInt);
                 curBit = 0;
                 curInt = 0;
             }
         } else {
             int secPart = n - (32 - curBit);
             curInt |= value >>> secPart;
-            os.putInt(curInt);
+            putInt(curInt);
             curInt = value << (32 - secPart);
             curBit = secPart;
         }
@@ -61,7 +66,7 @@ public class BitWriter {
         curInt |= bit << (32 - curBit - 1);
         ++curBit;
         if (curBit == 32) {
-            os.putInt(curInt);
+            putInt(curInt);
             curBit = 0;
             curInt = 0;
         }

@@ -168,9 +168,9 @@ public class MBlockDecoderInter {
                 ResidualBlock block = luma[(i8x8 << 2) + i4x4];
                 int[] transformed;
                 if (block != null) {
-                    int[] reordered = transform.reorderCoeffs(block.getCoeffs());
-                    int[] rescaled = transform.rescaleBeforeIDCT4x4(reordered, qp);
-                    transformed = transform.transformIDCT4x4(rescaled);
+                    transformed = transform.unzigzagAC(block.getCoeffs());
+                    transform.dequantizeAC(transformed, qp);
+                    transform.idct4x4(transformed);
                 } else {
                     transformed = new int[16];
                 }

@@ -33,33 +33,43 @@ public class CAVLC {
         this.chromaDCVLC = codeTableChromaDC();
     }
 
-    public void writeBlock(BitWriter out, int[] coeff, VLC coeffTokenTab, VLC[] totalZerosTab) {
-
-        int trailingOne = 0, totalCoeff = 0, totalZeros = 0;
-        int[] runBefore = new int[coeff.length];
-        int[] levels = new int[coeff.length];
-        for (int i = 0; i < coeff.length; i++) {
-            if (coeff[i] == 0) {
+    public int writeBlock(BitWriter out, int[] coeff, VLC coeffTokenTab, VLC[] totalZerosTab, int firstCoeff,
+            int maxCoeff, int[] scan) {
+        int trailingOnes = 0, totalCoeff = 0, totalZeros = 0;
+        int[] runBefore = new int[maxCoeff];
+        int[] levels = new int[maxCoeff];
+        for (int i = 0; i < maxCoeff; i++) {
+            int c = coeff[scan[i + firstCoeff]];
+            if (c == 0) {
                 runBefore[totalCoeff]++;
                 totalZeros++;
             } else {
-                levels[totalCoeff++] = coeff[i];
+                levels[totalCoeff++] = c;
             }
         }
-        for (trailingOne = 0; trailingOne < totalCoeff && Math.abs(levels[totalCoeff - trailingOne - 1]) == 1; trailingOne++)
+        if (totalCoeff < maxCoeff)
+            totalZeros -= runBefore[totalCoeff];
+
+        for (trailingOnes = 0; trailingOnes < totalCoeff && trailingOnes < 3
+                && Math.abs(levels[totalCoeff - trailingOnes - 1]) == 1; trailingOnes++)
             ;
 
-        coeffTokenTab.writeVLC(out, (totalCoeff << 4) | trailingOne);
+        int coeffToken = coeffToken(totalCoeff, trailingOnes);
+//        System.out.println(String.format("# c & tr.1s #c=%d #t1=%d", totalCoeff, trailingOnes));
+
+        coeffTokenTab.writeVLC(out, coeffToken);
 
         if (totalCoeff > 0) {
-            writeTrailingOnes(out, levels, totalCoeff, trailingOne);
-            writeLevels(out, levels, totalCoeff, trailingOne);
+            writeTrailingOnes(out, levels, totalCoeff, trailingOnes);
+            writeLevels(out, levels, totalCoeff, trailingOnes);
 
-            if (totalCoeff < coeff.length) {
+            if (totalCoeff < maxCoeff) {
                 totalZerosTab[totalCoeff - 1].writeVLC(out, totalZeros);
                 writeRuns(out, runBefore, totalCoeff, totalZeros);
             }
         }
+
+        return coeffToken;
     }
 
     private void writeTrailingOnes(BitWriter out, int[] levels, int totalCoeff, int trailingOne) {
@@ -71,11 +81,12 @@ public class CAVLC {
 
         int suffixLen = totalCoeff > 10 && trailingOnes < 3 ? 1 : 0;
         for (int i = totalCoeff - trailingOnes - 1; i >= 0; i--) {
-            int absLev = MathUtil.golomb(levels[i]);
-            int prefix = absLev >> suffixLen;
+            int absLev = unsigned(levels[i]);
             if (i == totalCoeff - trailingOnes - 1 && trailingOnes < 3)
                 absLev -= 2;
-            if (suffixLen == 0 && prefix <= 13 || prefix <= 14) {
+
+            int prefix = absLev >> suffixLen;
+            if (suffixLen == 0 && prefix < 14 || suffixLen > 0 && prefix < 15) {
                 out.writeNBit(1, prefix + 1);
                 out.writeNBit(absLev, suffixLen);
             } else if (suffixLen == 0 && absLev < 30) {
@@ -85,10 +96,10 @@ public class CAVLC {
                 if (suffixLen == 0)
                     absLev -= 15;
                 int len, code;
-                for (len = 12; (code = absLev - len - 3 - (1 << len) + 4096) >= (1 << len); len++)
+                for (len = 12; (code = absLev - (len + 3 << suffixLen) - (1 << len) + 4096) >= (1 << len); len++)
                     ;
                 out.writeNBit(1, len + 4);
-                out.writeNBit(len, code);
+                out.writeNBit(code, len);
             }
             if (suffixLen == 0)
                 suffixLen = 1;
@@ -97,9 +108,16 @@ public class CAVLC {
         }
     }
 
+    private final int unsigned(int signed) {
+        int sign = signed >>> 31;
+        int s = signed >> 31;
+
+        return (((signed ^ s) - s) << 1) + sign - 2;
+    }
+
     private void writeRuns(BitWriter out, int[] run, int totalCoeff, int totalZeros) {
-        for (int i = 0; i < totalCoeff; i++) {
-            H264Const.run[Math.min(7, totalZeros)].writeVLC(out, run[i]);
+        for (int i = totalCoeff - 1; i > 0 && totalZeros > 0; i--) {
+            H264Const.run[Math.min(6, totalZeros - 1)].writeVLC(out, run[i]);
             totalZeros -= run[i];
         }
     }
@@ -122,9 +140,12 @@ public class CAVLC {
 
         if (leftAvailable && topAvailable)
             return (nA + nB + 1) >> 1;
+        else if (leftAvailable)
+            return nA;
+        else if (topAvailable)
+            return nB;
         else
-            return nA + nB;
-
+            return 0;
     }
 
     protected VLC codeTableChromaDC() {
@@ -238,11 +259,11 @@ public class CAVLC {
     public static final int coeffToken(int totalCoeff, int trailingOnes) {
         return (totalCoeff << 4) | trailingOnes;
     }
-    
+
     public static final int totalCoeff(int coeffToken) {
         return coeffToken >> 4;
     }
-    
+
     public static final int trailingOnes(int coeffToken) {
         return coeffToken & 0xf;
     }

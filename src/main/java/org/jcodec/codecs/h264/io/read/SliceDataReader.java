@@ -76,51 +76,7 @@ public class SliceDataReader {
     }
 
     public Macroblock[] readCABAC(BitReader in, SliceHeader sh, MBlockReader mBlockReader, MBlockMapper mBlockMap) {
-
-        List<Macroblock> mblocks = new ArrayList<Macroblock>();
-
-        while (in.curBit() != 0) {
-            readNBit(in, 1, "DAT: cabac_alignment_one_bit");
-        }
-
-        boolean mbaffFrameFlag = (mbaff && !sh.field_pic_flag);
-
-        boolean moreData = true;
-        boolean prevMbSkipped = false;
-        for (int i = 0; moreData; i++) {
-            boolean mb_skip_flag = false;
-
-            if (sh.slice_type.isInter()) {
-                mb_skip_flag = readAE(in);
-                moreData = !mb_skip_flag;
-            }
-
-            boolean mb_field_decoding_flag = false;
-            if (mbaffFrameFlag && (i % 2 == 0 || (i % 2 == 1 && prevMbSkipped))) {
-                mb_field_decoding_flag = readBool(in, "mb_field_decoding_flag");
-            }
-
-            MBlockNeighbourhood neighbourhood = calcNeighbourhood(i, mblocks, mBlockMap);
-
-            // println("*********** POC: X (I/P) MB: " + currMbAddr
-            // + " Slice: X Type X **********");
-            //
-            int mbType = readUE(in, "MB: mb_type");
-
-            Macroblock mblock = mBlockReader.read(sh.slice_type, mbType, in, neighbourhood, mb_field_decoding_flag);
-
-            mblocks.set(i, mblock);
-            if (sh.slice_type.isInter())
-                prevMbSkipped = mb_skip_flag;
-            if (mbaffFrameFlag && i % 2 == 0) {
-                moreData = true;
-            } else {
-                boolean end_of_slice_flag = readAE(in);
-                moreData = !end_of_slice_flag;
-            }
-        }
-
-        return mblocks.toArray(new Macroblock[] {});
+        throw new RuntimeException("CABAC");
     }
 
     public Macroblock[] readCAVLC(BitReader in, SliceHeader sh, MBlockReader mBlockReader, MBlockMapper mBlockMap) {

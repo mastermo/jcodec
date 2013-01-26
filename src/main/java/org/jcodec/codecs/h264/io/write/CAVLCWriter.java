@@ -4,6 +4,7 @@ import static org.jcodec.common.tools.Debug.print;
 import static org.jcodec.common.tools.Debug.println;
 
 import org.jcodec.common.io.BitWriter;
+import org.jcodec.common.tools.MathUtil;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -48,9 +49,7 @@ public class CAVLCWriter {
 
     public static void writeSE(BitWriter out, int value, String string)  {
         print(string + "\t");
-        int sign = (value >> 31);
-        int mod = (value ^ sign) - sign;
-        writeUE(out, (mod << 1) - (sign + 1));
+        writeUE(out, MathUtil.golomb(value));
         println("\t" + value);
     }
 
