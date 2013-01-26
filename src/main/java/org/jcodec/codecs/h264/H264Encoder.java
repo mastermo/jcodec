@@ -50,7 +50,6 @@ public class H264Encoder {
     }
 
     public ByteBuffer encodeFrame(ByteBuffer _out, Picture pic) {
-        System.out.println("================== FRAME ====================");
         ByteBuffer dup = _out.duplicate();
 
         dup.putInt(0x1);
@@ -111,7 +110,6 @@ public class H264Encoder {
         for (int mbY = 0; mbY < sps.pic_height_in_map_units_minus1 + 1; mbY++) {
             for (int mbX = 0; mbX < sps.pic_width_in_mbs_minus1 + 1; mbX++) {
                 CAVLCWriter.writeUE(sliceData, 23); // I_16x16_2_2_1
-//                System.out.println("------------------ MB (" + mbX + "," + mbY + ") ---------------------");
                 encodeMacroblock(pic, mbX, mbY, sliceData, outMB);
                 collectPredictors(outMB, mbX);
             }
@@ -147,6 +145,8 @@ public class H264Encoder {
             byte b = buf.get();
             if (p1 == 0 && p2 == 0 && (b & 0xff) <= 3) {
                 dup.put((byte) 3);
+                p1 = p2;
+                p2 = 3;
             }
             dup.put(b);
             p1 = p2;
@@ -169,11 +169,8 @@ public class H264Encoder {
         int ch = pic.getColor().compHeight[1];
         int x = mbX << (4 - cw);
         int y = mbY << (4 - ch);
-        // System.out.println("-----------------------------------");
         int[][] ac1 = transformChroma(pic, 1, qp, cw, ch, x, y, outMB);
-        // System.out.println("\n-----------------------------------");
         int[][] ac2 = transformChroma(pic, 2, qp, cw, ch, x, y, outMB);
-        // System.out.println("\n-----------------------------------");
         int[] dc1 = extractDC(ac1);
         int[] dc2 = extractDC(ac2);
 
@@ -388,9 +385,6 @@ public class H264Encoder {
     private int[][] transform(Picture pic, int comp, int qp, int cw, int ch, int x, int y) {
         int dcc = lumaDCPred(x, y);
 
-        // int dcc = dc(pic.getPlaneData(comp), pic.getPlaneWidth(comp),
-        // pic.getPlaneHeight(comp), x, y, blkW, blkH);
-//        System.out.println("Luma DC pred: " + dcc);
         int[][] ac = new int[16 >> (cw + ch)][16];
         for (int i = 0; i < ac.length; i++) {
             int[] coeff = ac[i];
@@ -416,9 +410,6 @@ public class H264Encoder {
             coeff[dstOff + 1] = planeData[srcOff + 1] - dc;
             coeff[dstOff + 2] = planeData[srcOff + 2] - dc;
             coeff[dstOff + 3] = planeData[srcOff + 3] - dc;
-            // System.out.println(planeData[srcOff] + ", " + planeData[srcOff +
-            // 1] + ", " + planeData[srcOff + 2] + ", " + planeData[srcOff + 3]
-            // + ", ");
         }
     }
 

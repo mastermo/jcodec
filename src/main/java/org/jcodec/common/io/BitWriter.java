@@ -41,9 +41,6 @@ public class BitWriter {
             throw new IllegalArgumentException("Max 32 bit to write");
         if (n == 0)
             return;
-//        for (int i = n - 1; i >= 0; i--)
-//            System.out.print((value >> i) & 0x1);
-//        System.out.println();
         value &= -1 >>> (32 - n);
         if (32 - curBit >= n) {
             curInt |= value << (32 - curBit - n);

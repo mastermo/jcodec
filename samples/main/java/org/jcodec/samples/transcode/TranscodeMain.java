@@ -95,9 +95,11 @@ public class TranscodeMain {
 
     private static void prores2avc(String in, String out) throws IOException {
         FileChannel sink = null;
+        FileChannel raw = null;
         FileChannel source = null;
         try {
             sink = new FileOutputStream(new File(out)).getChannel();
+            raw = new FileOutputStream(new File("/Users/stan/Desktop/cool.264")).getChannel();
             source = new FileInputStream(new File(in)).getChannel();
 
             MP4Demuxer demux = new MP4Demuxer(source);
@@ -119,20 +121,26 @@ public class TranscodeMain {
             ArrayList<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
             ArrayList<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
             MP4Packet inFrame;
-            while ((inFrame = inTrack.getFrames(1)) != null) {
+            int totalFrames = (int)inTrack.getFrameCount();
+            for (int i = 0; (inFrame = inTrack.getFrames(1)) != null; i++) {
                 Picture dec = decoder.decodeFrame(inFrame.getData(), target1.getData());
                 transform.transform(dec, target2);
                 _out.clear();
                 ByteBuffer result = encoder.encodeFrame(_out, target2);
+                raw.write(result.duplicate());
                 spsList.clear();
                 ppsList.clear();
                 processFrame(result, spsList, ppsList);
                 outTrack.addFrame(new MP4Packet(inFrame, result));
+                if(i % 100 == 0)
+                    System.out.println((i * 100 / totalFrames) + "%");
             }
             outTrack.addSampleEntry(createSampleEntry(spsList, ppsList));
 
             muxer.writeHeader();
         } finally {
+            if (raw != null)
+                raw.close();
             if (sink != null)
                 sink.close();
             if (source != null)

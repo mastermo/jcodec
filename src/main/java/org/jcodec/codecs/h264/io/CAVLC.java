@@ -55,7 +55,6 @@ public class CAVLC {
             ;
 
         int coeffToken = coeffToken(totalCoeff, trailingOnes);
-//        System.out.println(String.format("# c & tr.1s #c=%d #t1=%d", totalCoeff, trailingOnes));
 
         coeffTokenTab.writeVLC(out, coeffToken);
 
