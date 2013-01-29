@@ -15,6 +15,7 @@ import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.codecs.util.PGMIO;
 import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.ColorSpace;
+import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Picture;
 
 /**
@@ -50,7 +51,7 @@ public class TestTool {
             System.exit(-1);
             return;
         }
-        
+
         Picture buf = Picture.create(1920, 1088, ColorSpace.YUV420);
 
         for (int i = 0;; i++) {
@@ -65,7 +66,7 @@ public class TestTool {
                         a.refFolder, nameForCr));
 
                 System.out.print("\nFrame " + i + " -- ");
-                ByteBuffer nextFrame = es.nextFrame();
+                ByteBuffer nextFrame = reorder(es.nextFrame());
                 Picture frame = decoder.decodeFrame(nextFrame.duplicate(), buf.getData());
                 if (frame == null)
                     break;
@@ -86,6 +87,10 @@ public class TestTool {
                 break;
             }
         }
+    }
+
+    private static ByteBuffer reorder(Packet nextFrame) {
+        throw new RuntimeException("POC reordering!!!");
     }
 
     private static Args checkArgs(String[] args) {

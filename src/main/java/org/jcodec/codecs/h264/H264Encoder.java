@@ -1,5 +1,6 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.codecs.h264.annexb.H264Utils.escapeNAL;
 import static org.jcodec.common.tools.MathUtil.clip;
 
 import java.nio.ByteBuffer;
@@ -55,17 +56,31 @@ public class H264Encoder {
         dup.putInt(0x1);
         new NALUnit(NALUnitType.SPS, 3).write(dup);
         SeqParameterSet sps = initSPS(pic);
-        sps.write(dup);
+        writeSPS(dup, sps);
 
         dup.putInt(0x1);
         new NALUnit(NALUnitType.PPS, 3).write(dup);
         PictureParameterSet pps = initPPS();
-        pps.write(dup);
+        writePPS(dup, pps);
 
         encodeSlice(sps, pps, pic, dup);
 
         dup.flip();
         return dup;
+    }
+
+    private void writePPS(ByteBuffer dup, PictureParameterSet pps) {
+        ByteBuffer tmp = ByteBuffer.allocate(1024);
+        pps.write(tmp);
+        tmp.flip();
+        escapeNAL(tmp, dup);
+    }
+
+    private void writeSPS(ByteBuffer dup, SeqParameterSet sps) {
+        ByteBuffer tmp = ByteBuffer.allocate(1024);
+        sps.write(tmp);
+        tmp.flip();
+        escapeNAL(tmp, dup);
     }
 
     private PictureParameterSet initPPS() {
@@ -134,23 +149,6 @@ public class H264Encoder {
         for (int i = 0; i < out.length; i++) {
             out[i] = planeData[off];
             off += stride;
-        }
-    }
-
-    private void escapeNAL(ByteBuffer buf, ByteBuffer dup) {
-        byte p1 = buf.get(), p2 = buf.get();
-        dup.put(p1);
-        dup.put(p2);
-        while (buf.hasRemaining()) {
-            byte b = buf.get();
-            if (p1 == 0 && p2 == 0 && (b & 0xff) <= 3) {
-                dup.put((byte) 3);
-                p1 = p2;
-                p2 = 3;
-            }
-            dup.put(b);
-            p1 = p2;
-            p2 = b;
         }
     }
 

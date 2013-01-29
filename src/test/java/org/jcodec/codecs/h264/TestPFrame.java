@@ -22,7 +22,7 @@ public class TestPFrame extends TestCase {
 		
 		H264Decoder h264Decoder = new H264Decoder();
 		Picture out = Picture.create(1920, 1088, ColorSpace.YUV420);
-		h264Decoder.decodeFrame(reader.nextFrame(), out.getData());
-		h264Decoder.decodeFrame(reader.nextFrame(), out.getData());
+		h264Decoder.decodeFrame(reader.nextFrame().getData(), out.getData());
+		h264Decoder.decodeFrame(reader.nextFrame().getData(), out.getData());
 	}
 }

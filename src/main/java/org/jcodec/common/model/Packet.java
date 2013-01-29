@@ -23,13 +23,7 @@ public class Packet {
 
     public Packet(ByteBuffer data, long pts, long timescale, long duration, long frameNo, boolean keyFrame,
             TapeTimecode tapeTimecode) {
-        this.data = data;
-        this.pts = pts;
-        this.timescale = timescale;
-        this.duration = duration;
-        this.frameNo = frameNo;
-        this.keyFrame = keyFrame;
-        this.tapeTimecode = tapeTimecode;
+        this(data, pts, timescale, duration, frameNo, keyFrame, tapeTimecode, 0);
     }
 
     public Packet(Packet other) {
@@ -45,6 +39,18 @@ public class Packet {
     public Packet(Packet other, TapeTimecode timecode) {
         this(other.data, other.pts, other.timescale, other.duration, other.frameNo, other.keyFrame, timecode);
         this.displayOrder = other.displayOrder;
+    }
+
+    public Packet(ByteBuffer data, long pts, long timescale, long duration, long frameNo, boolean keyFrame,
+            TapeTimecode tapeTimecode, int displayOrder) {
+        this.data = data;
+        this.pts = pts;
+        this.timescale = timescale;
+        this.duration = duration;
+        this.frameNo = frameNo;
+        this.keyFrame = keyFrame;
+        this.tapeTimecode = tapeTimecode;
+        this.displayOrder = displayOrder;
     }
 
     public ByteBuffer getData() {

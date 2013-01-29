@@ -28,7 +28,7 @@ public class LeafBox extends Box {
     }
 
     public void parse(ByteBuffer input) {
-        NIOUtils.read(input, (int) header.getBodySize());
+        data = NIOUtils.read(input, (int) header.getBodySize());
     }
 
     public ByteBuffer getData() {

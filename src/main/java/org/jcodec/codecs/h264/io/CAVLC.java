@@ -1,6 +1,5 @@
 package org.jcodec.codecs.h264.io;
 
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readZeroBitCount;
 import static org.jcodec.common.model.ColorSpace.YUV420;
@@ -160,8 +159,10 @@ public class CAVLC {
 
     public int readCoeffs(BitReader in, VLC coeffTokenTab, VLC[] totalZerosTab, int[] coeffLevel) {
         int coeffToken = coeffTokenTab.readVLC(in);
-        int totalCoeff = coeffToken >> 4;
-        int trailingOnes = coeffToken & 0xf;
+        int totalCoeff = totalCoeff(coeffToken);
+        int trailingOnes = trailingOnes(coeffToken);
+        // System.out.println("Coeff token. Total: " + totalCoeff +
+        // ", trailOne: " + trailingOnes);
 
         int maxCoeff = coeffLevel.length;
         // blockType.getMaxCoeffs();
@@ -169,78 +170,68 @@ public class CAVLC {
         // maxCoeff = 16 / (color.compWidth[1] * color.compHeight[1]);
 
         if (totalCoeff > 0) {
-            int suffixLength;
-            if (totalCoeff > 10 && trailingOnes < 3) {
-                suffixLength = 1;
-            } else {
-                suffixLength = 0;
-            }
+            int suffixLength = totalCoeff > 10 && trailingOnes < 3 ? 1 : 0;
 
             int[] level = new int[totalCoeff];
-            for (int i = 0; i < totalCoeff; i++) {
-                if (i < trailingOnes) {
-                    boolean trailing_ones_sign_flag = readBool(in, "RB: trailing_ones_sign_flag");
-                    level[i] = 1 - 2 * (trailing_ones_sign_flag ? 1 : 0);
-                } else {
-                    int level_prefix = readZeroBitCount(in, "");
-                    int levelSuffixSize = suffixLength;
-                    if (level_prefix == 14 && suffixLength == 0)
-                        levelSuffixSize = 4;
-                    if (level_prefix >= 15)
-                        levelSuffixSize = level_prefix - 3;
+            int i;
+            for (i = 0; i < trailingOnes; i++)
+                level[i] = 1 - 2 * in.read1Bit();
 
-                    int levelCode = (Min(15, level_prefix) << suffixLength);
-                    if (levelSuffixSize > 0) {
-                        int level_suffix = readU(in, levelSuffixSize, "RB: level_suffix");
-                        levelCode += level_suffix;
-                    }
-                    if (level_prefix >= 15 && suffixLength == 0)
-                        levelCode += 15;
-                    if (level_prefix >= 16)
-                        levelCode += (1 << (level_prefix - 3)) - 4096;
-                    if (i == trailingOnes && trailingOnes < 3)
-                        levelCode += 2;
+            for (; i < totalCoeff; i++) {
+                int level_prefix = readZeroBitCount(in, "");
+                int levelSuffixSize = suffixLength;
+                if (level_prefix == 14 && suffixLength == 0)
+                    levelSuffixSize = 4;
+                if (level_prefix >= 15)
+                    levelSuffixSize = level_prefix - 3;
 
-                    if (levelCode % 2 == 0)
-                        level[i] = (levelCode + 2) >> 1;
-                    else
-                        level[i] = (-levelCode - 1) >> 1;
-
-                    if (suffixLength == 0)
-                        suffixLength = 1;
-                    if (Abs(level[i]) > (3 << (suffixLength - 1)) && suffixLength < 6)
-                        suffixLength++;
+                int levelCode = (Min(15, level_prefix) << suffixLength);
+                if (levelSuffixSize > 0) {
+                    int level_suffix = readU(in, levelSuffixSize, "RB: level_suffix");
+                    levelCode += level_suffix;
                 }
+                if (level_prefix >= 15 && suffixLength == 0)
+                    levelCode += 15;
+                if (level_prefix >= 16)
+                    levelCode += (1 << (level_prefix - 3)) - 4096;
+                if (i == trailingOnes && trailingOnes < 3)
+                    levelCode += 2;
+
+                if (levelCode % 2 == 0)
+                    level[i] = (levelCode + 2) >> 1;
+                else
+                    level[i] = (-levelCode - 1) >> 1;
+
+                if (suffixLength == 0)
+                    suffixLength = 1;
+                if (Abs(level[i]) > (3 << (suffixLength - 1)) && suffixLength < 6)
+                    suffixLength++;
             }
+
             int zerosLeft;
             if (totalCoeff < maxCoeff) {
-                int total_zeros;
-
                 if (maxCoeff == 4) {
-                    total_zeros = H264Const.totalZeros4[totalCoeff - 1].readVLC(in);
+                    zerosLeft = H264Const.totalZeros4[totalCoeff - 1].readVLC(in);
                 } else if (maxCoeff == 8) {
-                    total_zeros = H264Const.totalZeros8[totalCoeff - 1].readVLC(in);
+                    zerosLeft = H264Const.totalZeros8[totalCoeff - 1].readVLC(in);
                 } else {
-                    total_zeros = H264Const.totalZeros16[totalCoeff - 1].readVLC(in);
+                    zerosLeft = H264Const.totalZeros16[totalCoeff - 1].readVLC(in);
                 }
-
-                zerosLeft = total_zeros;
             } else
                 zerosLeft = 0;
-            int[] run = new int[totalCoeff];
-            for (int i = 0; i < totalCoeff - 1; i++) {
-                if (zerosLeft > 0) {
-                    int run_before = H264Const.run[Math.min(7, zerosLeft)].readVLC(in);
-                    run[i] = run_before;
-                } else
-                    run[i] = 0;
-                zerosLeft = zerosLeft - run[i];
+
+            int[] runs = new int[totalCoeff];
+            int r;
+            for (r = 0; r < totalCoeff - 1 && zerosLeft > 0; r++) {
+                int run = H264Const.run[Math.min(6, zerosLeft - 1)].readVLC(in);
+                zerosLeft -= run;
+                runs[r] = run;
             }
-            run[totalCoeff - 1] = zerosLeft;
-            int coeffNum = -1;
-            for (int i = totalCoeff - 1; i >= 0; i--) {
-                coeffNum += run[i] + 1;
-                coeffLevel[coeffNum] = level[i];
+            runs[r] = zerosLeft;
+
+            for (int j = totalCoeff - 1, cn = 0; j >= 0; j--, cn++) {
+                cn += runs[j];
+                coeffLevel[cn] = level[j];
             }
         }
 

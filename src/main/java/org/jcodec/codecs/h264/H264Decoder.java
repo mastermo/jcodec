@@ -1,8 +1,11 @@
 package org.jcodec.codecs.h264;
 
+import static org.jcodec.codecs.h264.annexb.H264Utils.unescapeNAL;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jcodec.codecs.h264.annexb.H264Utils;
 import org.jcodec.codecs.h264.decode.SliceDecoder;
@@ -11,8 +14,6 @@ import org.jcodec.codecs.h264.decode.aso.MapManager;
 import org.jcodec.codecs.h264.decode.deblock.DeblockingFilter;
 import org.jcodec.codecs.h264.decode.deblock.FilterParameter;
 import org.jcodec.codecs.h264.decode.deblock.FilterParameterBuilder;
-import org.jcodec.codecs.h264.decode.dpb.DecodedPicture;
-import org.jcodec.codecs.h264.decode.dpb.RefListBuilder;
 import org.jcodec.codecs.h264.decode.imgop.Flattener;
 import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
 import org.jcodec.codecs.h264.decode.model.DecodedSlice;
@@ -22,13 +23,15 @@ import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.RefPicMarking;
-import org.jcodec.codecs.h264.io.model.RefPicMarking.InstrType;
 import org.jcodec.codecs.h264.io.model.RefPicMarkingIDR;
+import org.jcodec.codecs.h264.io.model.RefPicReordering;
+import org.jcodec.codecs.h264.io.model.RefPicReordering.ReorderOp;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.io.read.SliceDataReader;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.common.ArrayUtil;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.VideoDecoder;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.ColorSpace;
@@ -50,12 +53,13 @@ public class H264Decoder implements VideoDecoder {
 
     private TIntObjectHashMap<SeqParameterSet> sps = new TIntObjectHashMap<SeqParameterSet>();
     private TIntObjectHashMap<PictureParameterSet> pps = new TIntObjectHashMap<PictureParameterSet>();
-    private DecodedPicture[] references;
-    private int prevFrameNumOffset;
-    private int prevFrameNum;
+    private Picture[] references;
+    private int nLongTerm = 0;
+    private List<Picture> pictureBuffer;
 
-    private int prevPicOrderCntMsb;
-    private int prevPicOrderCntLsb;
+    public H264Decoder() {
+        pictureBuffer = new ArrayList<Picture>();
+    }
 
     @Override
     public Picture decodeFrame(ByteBuffer data, int[][] buffer) {
@@ -70,7 +74,6 @@ public class H264Decoder implements VideoDecoder {
         private SliceDataReader dataReader;
         private MapManager mapManager;
         private SliceDecoder sliceDecoder;
-        private RefListBuilder refListBuilder;
         private DeblockingFilter filter;
         private int picWidthInMbs;
         private int picHeightInMbs;
@@ -78,12 +81,11 @@ public class H264Decoder implements VideoDecoder {
         private SliceHeader[] headers;
         private SliceHeader firstSliceHeader;
         private NALUnit firstNu;
-        private int maxFrameNum;
-        private int maxPicOrderCntLsb;
 
         public Picture decodeFrame(ByteBuffer data, int[][] buffer) {
             ByteBuffer segment;
             while ((segment = H264Utils.nextNALUnit(data)) != null) {
+                NIOUtils.skip(segment, 4);
                 NALUnit marker = NALUnit.read(segment);
                 switch (marker.type) {
                 case NON_IDR_SLICE:
@@ -115,129 +117,12 @@ public class H264Decoder implements VideoDecoder {
             return result;
         }
 
-        private boolean detectMMCO5(RefPicMarking refPicMarkingNonIDR) {
-            if (refPicMarkingNonIDR == null)
-                return false;
-
-            for (RefPicMarking.Instruction instr : refPicMarkingNonIDR.getInstructions()) {
-                if (instr.getType() == InstrType.CLEAR) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private int updateFrameNumber(int frameNo, boolean mmco5) {
-            int frameNumOffset;
-            if (prevFrameNum > frameNo)
-                frameNumOffset = prevFrameNumOffset + maxFrameNum;
-            else
-                frameNumOffset = prevFrameNumOffset;
-
-            int absFrameNum = frameNumOffset + frameNo;
-
-            prevFrameNum = mmco5 ? 0 : frameNo;
-            prevFrameNumOffset = frameNumOffset;
-            return absFrameNum;
-        }
-
-        private int calcPoc(int absFrameNum, NALUnit nu, SliceHeader sh) {
-            if (activeSps.pic_order_cnt_type == 0) {
-                return calcPOC0(absFrameNum, nu, sh);
-            } else if (activeSps.pic_order_cnt_type == 1) {
-                return calcPOC1(absFrameNum, nu, sh);
-            } else {
-                return calcPOC2(absFrameNum, nu, sh);
-            }
-        }
-
-        private int calcPOC2(int absFrameNum, NALUnit nu, SliceHeader sh) {
-
-            if (nu.nal_ref_idc == 0)
-                return 2 * absFrameNum - 1;
-            else
-                return 2 * absFrameNum;
-        }
-
-        private int calcPOC1(int absFrameNum, NALUnit nu, SliceHeader sh) {
-
-            if (activeSps.num_ref_frames_in_pic_order_cnt_cycle == 0)
-                absFrameNum = 0;
-            if (nu.nal_ref_idc == 0 && absFrameNum > 0)
-                absFrameNum = absFrameNum - 1;
-
-            int expectedDeltaPerPicOrderCntCycle = 0;
-            for (int i = 0; i < activeSps.num_ref_frames_in_pic_order_cnt_cycle; i++)
-                expectedDeltaPerPicOrderCntCycle += activeSps.offsetForRefFrame[i];
-
-            int expectedPicOrderCnt;
-            if (absFrameNum > 0) {
-                int picOrderCntCycleCnt = (absFrameNum - 1) / activeSps.num_ref_frames_in_pic_order_cnt_cycle;
-                int frameNumInPicOrderCntCycle = (absFrameNum - 1) % activeSps.num_ref_frames_in_pic_order_cnt_cycle;
-
-                expectedPicOrderCnt = picOrderCntCycleCnt * expectedDeltaPerPicOrderCntCycle;
-                for (int i = 0; i <= frameNumInPicOrderCntCycle; i++)
-                    expectedPicOrderCnt = expectedPicOrderCnt + activeSps.offsetForRefFrame[i];
-            } else {
-                expectedPicOrderCnt = 0;
-            }
-            if (nu.nal_ref_idc == 0)
-                expectedPicOrderCnt = expectedPicOrderCnt + activeSps.offset_for_non_ref_pic;
-
-            return expectedPicOrderCnt + sh.delta_pic_order_cnt[0];
-        }
-
-        private int calcPOC0(int absFrameNum, NALUnit nu, SliceHeader sh) {
-
-            int pocCntLsb = sh.pic_order_cnt_lsb;
-
-            // TODO prevPicOrderCntMsb should be wrapped!!
-            int picOrderCntMsb;
-            if ((pocCntLsb < prevPicOrderCntLsb) && ((prevPicOrderCntLsb - pocCntLsb) >= (maxPicOrderCntLsb / 2)))
-                picOrderCntMsb = prevPicOrderCntMsb + maxPicOrderCntLsb;
-            else if ((pocCntLsb > prevPicOrderCntLsb) && ((pocCntLsb - prevPicOrderCntLsb) > (maxPicOrderCntLsb / 2)))
-                picOrderCntMsb = prevPicOrderCntMsb - maxPicOrderCntLsb;
-            else
-                picOrderCntMsb = prevPicOrderCntMsb;
-
-            if (nu.nal_ref_idc != 0) {
-                prevPicOrderCntMsb = picOrderCntMsb;
-                prevPicOrderCntLsb = pocCntLsb;
-            }
-
-            return picOrderCntMsb + pocCntLsb;
-        }
-
-        private void issueNonExistingPic(SliceHeader sh) {
-            int nextFrameNum = (prevFrameNum + 1) % maxFrameNum;
-            // refPictureManager.addNonExisting(nextFrameNum);
-            prevFrameNum = nextFrameNum;
-        }
-
-        private boolean detectGap(SliceHeader sh) {
-            return sh.frame_num != prevFrameNum && sh.frame_num != ((prevFrameNum + 1) % maxFrameNum);
-        }
-
         private void updateReferences(Picture picture) {
-            if (detectGap(firstSliceHeader)) {
-                issueNonExistingPic(firstSliceHeader);
-            }
-            boolean mmco5 = detectMMCO5(firstSliceHeader.refPicMarkingNonIDR);
-            int absFrameNum = updateFrameNumber(firstSliceHeader.frame_num, mmco5);
-
-            int poc = 0;
-            if (firstNu.type == NALUnitType.NON_IDR_SLICE) {
-                poc = calcPoc(absFrameNum, firstNu, firstSliceHeader);
-            }
-
-            DecodedPicture dp = new DecodedPicture(picture, poc, true, firstNu.nal_ref_idc != 0,
-                    firstNu.type == NALUnitType.IDR_SLICE || mmco5 ? 0 : firstSliceHeader.frame_num, false, mmco5);
-
             if (firstNu.nal_ref_idc != 0) {
                 if (firstNu.type == NALUnitType.IDR_SLICE) {
-                    performIDRMarking(firstSliceHeader.refPicMarkingIDR, dp);
+                    performIDRMarking(firstSliceHeader.refPicMarkingIDR, picture);
                 } else {
-                    performMarking(firstSliceHeader.refPicMarkingNonIDR, dp);
+                    performMarking(firstSliceHeader.refPicMarkingNonIDR, picture);
                 }
             }
         }
@@ -245,14 +130,13 @@ public class H264Decoder implements VideoDecoder {
         private void init(int[][] buffer, ByteBuffer segment, NALUnit marker) {
             firstNu = marker;
 
-            picWidthInMbs = activeSps.pic_width_in_mbs_minus1 + 1;
-            picHeightInMbs = activeSps.pic_height_in_map_units_minus1 + 1;
-
             shr = new SliceHeaderReader();
             BitReader br = new BitReader(segment.duplicate());
             firstSliceHeader = shr.readPart1(br);
             activePps = pps.get(firstSliceHeader.pic_parameter_set_id);
             activeSps = sps.get(activePps.seq_parameter_set_id);
+            picWidthInMbs = activeSps.pic_width_in_mbs_minus1 + 1;
+            picHeightInMbs = activeSps.pic_height_in_map_units_minus1 + 1;
             shr.readPart2(firstSliceHeader, marker, activeSps, activePps, br);
             result = createPicture(activeSps, buffer);
             dataReader = new SliceDataReader(activePps.extended != null ? activePps.extended.transform_8x8_mode_flag
@@ -269,7 +153,6 @@ public class H264Decoder implements VideoDecoder {
             sliceDecoder = new SliceDecoder(activePps.pic_init_qp_minus26 + 26, chromaQpOffset,
                     activeSps.pic_width_in_mbs_minus1 + 1, activeSps.bit_depth_luma_minus8 + 8,
                     activeSps.bit_depth_chroma_minus8 + 8, activePps.constrained_intra_pred_flag);
-            refListBuilder = new RefListBuilder(1 << (activeSps.log2_max_frame_num_minus4 + 4));
 
             filter = new DeblockingFilter(activeSps.pic_width_in_mbs_minus1 + 1,
                     activeSps.pic_height_in_map_units_minus1 + 1, activeSps.bit_depth_luma_minus8 + 8,
@@ -280,140 +163,146 @@ public class H264Decoder implements VideoDecoder {
 
             mblocks = new DecodedMBlock[mblocksInFrame];
             headers = new SliceHeader[mblocksInFrame];
-
-            maxFrameNum = 1 << (activeSps.log2_max_frame_num_minus4 + 4);
-            maxPicOrderCntLsb = 1 << (activeSps.log2_max_pic_order_cnt_lsb_minus4 + 4);
         }
 
         private void decodeSlice(ByteBuffer segment, NALUnit nalUnit) {
+            unescapeNAL(segment);
             BitReader br = new BitReader(segment);
             SliceHeader sh = shr.readPart1(br);
             shr.readPart2(sh, nalUnit, activeSps, activePps, br);
             MBlockMapper mapper = mapManager.getMapper(sh);
             Macroblock[] read = dataReader.read(br, sh, mapper);
-            Picture[] refList = refListBuilder.buildRefList(references, sh.refPicReorderingL0, sh.frame_num);
+            Picture[] refList = sh.refPicReorderingL0 == null ? references : buildRefList(references, nLongTerm,
+                    sh.refPicReorderingL0);
+
             CodedSlice slice = new CodedSlice(sh, read);
             DecodedSlice decodeSlice = sliceDecoder.decodeSlice(slice, refList, mapper);
             mapDecodedMBlocks(decodeSlice, slice, headers, mblocks, mapper);
         }
 
-        public void performIDRMarking(RefPicMarkingIDR refPicMarkingIDR, DecodedPicture curPic) {
+        public Picture[] buildRefList(Picture[] buf, int nLongTerm, RefPicReordering refPicReordering) {
+            Picture[] result = new Picture[buf.length];
+
+            int pred = 0, i = 0;
+            for (ReorderOp instr : refPicReordering.getInstructions()) {
+                switch (instr.getType()) {
+                case FORWARD:
+                    result[i++] = buf[pred += instr.getParam()];
+                    break;
+                case BACKWARD:
+                    result[i++] = buf[pred -= instr.getParam()];
+                    break;
+                case LONG_TERM:
+                    result[i++] = buf[buf.length - nLongTerm + instr.getParam()];
+                    break;
+                }
+            }
+            return result;
+        }
+
+        public void performIDRMarking(RefPicMarkingIDR refPicMarkingIDR, Picture picture) {
             clearAll();
 
-            if (refPicMarkingIDR.isUseForlongTerm()) {
-                curPic.makeLongTerm(0);
-            }
-            references[0] = curPic;
-        }
-
-        private int getRefPicNum(DecodedPicture ref, DecodedPicture curPicture) {
-
-            int refFrameNum = ref.getFrameNum();
-            if (refFrameNum > curPicture.getFrameNum())
-                return refFrameNum - maxFrameNum;
+            Picture saved = saveRef(picture);
+            if (refPicMarkingIDR.isUseForlongTerm())
+                throw new RuntimeException("Save long term");
             else
-                return refFrameNum;
+                references[0] = saved;
         }
 
-        private void unrefShortTerm(int picNum, DecodedPicture curPicture) {
-            for (int i = 0; i < references.length; i++) {
-                DecodedPicture pic = references[i];
-                if (pic == null)
-                    break;
-                else if (!pic.isLongTerm() && getRefPicNum(pic, curPicture) == picNum) {
-                    ArrayUtil.shiftLeft(references, i);
-                    break;
-                }
+        private Picture saveRef(Picture decoded) {
+            Picture picture = pictureBuffer.size() > 0 ? pictureBuffer.remove(0) : decoded.createCompatible();
+            picture.copyFrom(decoded);
+            return picture;
+        }
+
+        private void releaseRef(Picture picture) {
+            if (picture != null) {
+                pictureBuffer.add(picture);
             }
         }
 
-        private void unrefLongTerm(int longTermId) {
-            for (int i = 0; i < references.length; i++) {
-                DecodedPicture pic = references[i];
-                if (pic == null)
-                    break;
-                else if (pic.isLongTerm() && pic.getLtPicId() == longTermId) {
-                    ArrayUtil.shiftLeft(references, i);
-                    nLongTerm--;
-                    break;
-                }
-            }
+        private void unrefShortTerm(int picNum) {
+            releaseRef(removeShort(picNum));
         }
 
-        private void convert(int shortNo, int longNo, DecodedPicture curPicture) {
-            for (int i = 0; i < references.length; i++) {
-                DecodedPicture pic = references[i];
-                if (pic == null)
-                    break;
-                else if (!pic.isLongTerm() && getRefPicNum(pic, curPicture) == shortNo) {
-                    pic.makeLongTerm(longNo);
-                    nLongTerm++;
-                    int insertPos = findPos(references, longNo);
-                    ArrayUtil.shiftLeft(references, i, insertPos);
-                    references[insertPos - 1] = pic;
-                    break;
-                }
-            }
+        private Picture removeShort(int picNum) {
+            if (picNum < references.length - nLongTerm && references[picNum] != null) {
+                Picture ret = references[picNum];
+                ArrayUtil.shiftLeft(references, picNum, references.length - nLongTerm);
+                return ret;
+            } else
+                throw new RuntimeException("Trying to unreference non-existent short term reference: " + picNum);
         }
 
-        private int findPos(DecodedPicture[] references, int longNo) {
-            int i;
-            for (i = 0; i < references.length; i++) {
-                DecodedPicture pic = references[i];
-                if (pic == null)
-                    break;
-                if (pic.isLongTerm() && pic.getLtPicId() > longNo)
-                    break;
-            }
-            return i;
+        private void unrefLongTerm(int ltId) {
+            if (ltId < nLongTerm) {
+                int ltStart = references.length - nLongTerm;
+                int ltInd = ltStart + ltId;
+                releaseRef(references[ltInd]);
+                ArrayUtil.shiftRight(references, ltStart, ltInd + 1);
+                --nLongTerm;
+            } else
+                throw new RuntimeException("Trying to unreference non-existent long term reference: " + ltId);
         }
 
-        private void truncateLongTerm(int no) {
-            for (int i = 0; i < references.length; i++) {
-                DecodedPicture pic = references[i];
-                if (pic == null)
-                    break;
-                else if (pic.isLongTerm() && pic.getLtPicId() > no) {
-                    ArrayUtil.shiftLeft(references, i);
-                    --i;
-                    nLongTerm--;
-                }
-            }
+        private void convert(int shortNo, int longNo) {
+            addLong(removeShort(shortNo), longNo);
+        }
+
+        private Picture addLong(Picture picture, int ltId) {
+            if (ltId > nLongTerm)
+                throw new RuntimeException("Gaps in long term pictures");
+            nLongTerm++;
+            int ltStart = references.length - nLongTerm;
+            int ltInd = ltStart + ltId;
+            Picture ret = references[ltStart];
+            ArrayUtil.shiftLeft(references, ltStart, ltInd + 1);
+            references[ltInd] = picture;
+
+            return ret;
+        }
+
+        private void saveLong(Picture picture, int ltId) {
+            releaseRef(addLong(picture, ltId));
+        }
+
+        private void truncateLongTerm(int ltId) {
+            if (ltId > nLongTerm)
+                throw new RuntimeException("Gaps in long term pictures");
+            for (; nLongTerm > ltId; nLongTerm--)
+                ArrayUtil.shiftRight(references, references.length - nLongTerm);
+        }
+
+        private void saveShort(Picture saved) {
+            releaseRef(references[references.length - nLongTerm - 1]);
+            ArrayUtil.shiftRight(references, references.length - nLongTerm);
+            references[0] = saved;
         }
 
         public void clearAll() {
-            references = new DecodedPicture[activeSps.num_ref_frames];
+            if (references != null) {
+                for (Picture picture : references)
+                    releaseRef(picture);
+            }
+            references = new Picture[activeSps.num_ref_frames];
             nLongTerm = 0;
         }
 
-        int nLongTerm = 0;
-
-        public void performMarking(RefPicMarking refPicMarking, DecodedPicture curPic) {
+        public void performMarking(RefPicMarking refPicMarking, Picture picture) {
+            Picture saved = saveRef(picture);
 
             if (refPicMarking != null) {
-
-                // for (RefPicMarking.Instruction instr : refPicMarking
-                // .getInstructions()) {
-                // if (instr.getType() == InstrType.CLEAR) {
-                // curPic.resetFrameNum();
-                // }
-                // }
-
-                int curFrameNum = curPic.getFrameNum();
                 for (RefPicMarking.Instruction instr : refPicMarking.getInstructions()) {
                     switch (instr.getType()) {
                     case REMOVE_SHORT:
-                        int frm = curFrameNum - instr.getArg1();
-                        unrefShortTerm(frm, curPic);
+                        unrefShortTerm(instr.getArg1());
                         break;
-
                     case REMOVE_LONG:
                         unrefLongTerm(instr.getArg1());
                         break;
                     case CONVERT_INTO_LONG:
-                        int stNo = curFrameNum - instr.getArg1();
-                        int ltNo = instr.getArg2();
-                        convert(stNo, ltNo, curPic);
+                        convert(instr.getArg1(), instr.getArg2());
                         break;
                     case TRUNK_LONG:
                         truncateLongTerm(instr.getArg1() - 1);
@@ -422,12 +311,13 @@ public class H264Decoder implements VideoDecoder {
                         clearAll();
                         break;
                     case MARK_LONG:
-                        curPic.makeLongTerm(instr.getArg1());
+                        saveLong(saved, instr.getArg1());
+                        saved = null;
                     }
                 }
             }
-            ArrayUtil.shiftRight(references, references.length - nLongTerm);
-            references[0] = curPic;
+            if (saved != null)
+                saveShort(saved);
         }
     }
 
@@ -499,5 +389,23 @@ public class H264Decoder implements VideoDecoder {
     public int probe(ByteBuffer data) {
         // TODO Auto-generated method stub
         return 0;
+    }
+
+    public void addSps(List<ByteBuffer> spsList) {
+        for (ByteBuffer byteBuffer : spsList) {
+            ByteBuffer dup = byteBuffer.duplicate();
+            unescapeNAL(dup);
+            SeqParameterSet s = SeqParameterSet.read(dup);
+            sps.put(s.seq_parameter_set_id, s);
+        }
+    }
+
+    public void addPps(List<ByteBuffer> ppsList) {
+        for (ByteBuffer byteBuffer : ppsList) {
+            ByteBuffer dup = byteBuffer.duplicate();
+            unescapeNAL(dup);
+            PictureParameterSet p = PictureParameterSet.read(dup);
+            pps.put(p.pic_parameter_set_id, p);
+        }
     }
 }

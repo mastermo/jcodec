@@ -7,12 +7,14 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 import org.apache.commons.io.IOUtils;
 import org.jcodec.codecs.h264.H264Decoder;
 import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.common.NIOUtils;
 import org.jcodec.common.model.ColorSpace;
+import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Picture;
 
 /**
@@ -99,7 +101,7 @@ public class ConformanceTestTool {
                 Picture buf = Picture.create(1920, 1088, ColorSpace.YUV420);
                 Picture pic;
                 int i = 0;
-                while ((pic = decoder.decodeFrame(demuxer.nextFrame(), buf.getData())) != null) {
+                while ((pic = decoder.decodeFrame(reorder(demuxer.nextFrame()), buf.getData())) != null) {
                     if (rawReader == null || oldWidth != pic.getWidth() || oldHeight != pic.getHeight()) {
                         rawReader = new RawReader(decoded, pic.getWidth(), pic.getHeight());
                         oldWidth = pic.getWidth();
@@ -130,6 +132,10 @@ public class ConformanceTestTool {
             sb.append("FAILED");
             t.printStackTrace();
         }
+    }
+
+    private ByteBuffer reorder(Packet nextFrame) {
+        throw new RuntimeException("Display order reordering!!!");
     }
 
     private static boolean compare(Picture expected, Picture actual) {

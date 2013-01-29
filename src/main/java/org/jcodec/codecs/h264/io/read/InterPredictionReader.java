@@ -33,7 +33,6 @@ public class InterPredictionReader {
         int[] refIdxL0 = new int[numPartitions];
         for (int mbPartIdx = 0; mbPartIdx < numPartitions; mbPartIdx++) {
             if ((numRefIdxL0Active > 1 || mb_field_decoding_flag) && predMode[mbPartIdx] != MBPartPredMode.Pred_L1) {
-
                 refIdxL0[mbPartIdx] = readTE(reader, numRefIdxL0Active - 1);
             }
         }

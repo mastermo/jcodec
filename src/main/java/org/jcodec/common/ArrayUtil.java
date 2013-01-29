@@ -24,7 +24,7 @@ public class ArrayUtil {
     }
 
     public static <T> void shiftRight(T[] array, int from, int to) {
-        for (int i = from + 1; i < to; i++) {
+        for (int i = to - 1; i > from; i--) {
             array[i] = array[i - 1];
         }
         array[from] = null;
@@ -42,7 +42,7 @@ public class ArrayUtil {
     }
 
     public static <T> void shiftRight(T[] array, int to) {
-        shiftLeft(array, 0, to);
+        shiftRight(array, 0, to);
     }
 
     public static final void swap(int[] arr, int ind1, int ind2) {

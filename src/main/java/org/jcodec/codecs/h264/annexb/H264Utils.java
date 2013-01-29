@@ -29,7 +29,7 @@ public class H264Utils {
      * @return
      */
     public static final ByteBuffer gotoNALUnit(ByteBuffer buf, int n) {
-        
+
         if (!buf.hasRemaining())
             return null;
 
@@ -52,13 +52,38 @@ public class H264Utils {
         }
         return result;
     }
-    
-    /**
-     * Removes emulation bytes from h.264 bytestream
-     * @param src
-     * @return
-     */
-    public static ByteBuffer emulationDecode(ByteBuffer src) {
-        return null;
+
+    public static final void unescapeNAL(ByteBuffer _buf) {
+        ByteBuffer in = _buf.duplicate();
+        ByteBuffer out = _buf.duplicate();
+        byte p1 = in.get();
+        out.put(p1);
+        byte p2 = in.get();
+        out.put(p2);
+        while (in.hasRemaining()) {
+            byte b = in.get();
+            if (p1 != 0 || p2 != 0 || b != 3)
+                out.put(b);
+            p1 = p2;
+            p2 = b;
+        }
+        _buf.limit(out.position());
+    }
+
+    public static final void escapeNAL(ByteBuffer src, ByteBuffer dst) {
+        byte p1 = src.get(), p2 = src.get();
+        dst.put(p1);
+        dst.put(p2);
+        while (src.hasRemaining()) {
+            byte b = src.get();
+            if (p1 == 0 && p2 == 0 && (b & 0xff) <= 3) {
+                dst.put((byte) 3);
+                p1 = p2;
+                p2 = 3;
+            }
+            dst.put(b);
+            p1 = p2;
+            p2 = b;
+        }
     }
 }

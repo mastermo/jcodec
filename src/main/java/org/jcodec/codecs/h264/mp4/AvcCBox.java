@@ -66,14 +66,14 @@ public class AvcCBox extends Box {
         for (int i = 0; i < nSPS; i++) {
             int spsSize = input.getShort();
             Assert.assertEquals(0x67, input.get() & 0xff);
-            spsList.add(NIOUtils.read(input, spsSize));
+            spsList.add(NIOUtils.read(input, spsSize - 1));
         }
 
         int nPPS = input.get() & 0xff;
         for (int i = 0; i < nPPS; i++) {
             int ppsSize = input.getShort();
             Assert.assertEquals(0x68, input.get() & 0xff);
-            ppsList.add(NIOUtils.read(input, ppsSize));
+            ppsList.add(NIOUtils.read(input, ppsSize - 1));
         }
     }
 

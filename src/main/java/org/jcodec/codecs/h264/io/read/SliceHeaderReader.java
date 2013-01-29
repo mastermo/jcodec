@@ -140,7 +140,7 @@ public class SliceHeaderReader {
         return uiRet;
     }
 
-    static int i = 0;
+//    static int i = 0;
 
     private static void readDecoderPicMarking(NALUnit nalUnit, SliceHeader sh, BitReader in) {
         if (nalUnit.type == NALUnitType.IDR_SLICE) {
@@ -252,7 +252,7 @@ public class SliceHeaderReader {
     }
 
     private static void readRefPicListReordering(SliceHeader sh, BitReader in) {
-        System.out.println(i++);
+//        System.out.println(i++);
         if (sh.slice_type.isInter()) {
             boolean ref_pic_list_reordering_flag_l0 = readBool(in, "SH: ref_pic_list_reordering_flag_l0");
             if (ref_pic_list_reordering_flag_l0) {

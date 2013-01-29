@@ -4,7 +4,6 @@ import static org.jcodec.codecs.h264.io.read.CAVLCReader.moreRBSPData;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readNBit;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readTrailingBits;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeBool;
@@ -134,8 +133,6 @@ public class PictureParameterSet extends BitstreamElement {
             }
             pps.extended.second_chroma_qp_index_offset = readSE(in, "PPS: second_chroma_qp_index_offset");
         }
-
-        readTrailingBits(in);
 
         return pps;
     }

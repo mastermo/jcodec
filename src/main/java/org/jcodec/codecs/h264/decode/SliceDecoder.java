@@ -75,6 +75,7 @@ public class SliceDecoder {
 
             if (mblock instanceof CodedMacroblock) {
                 CodedMacroblock cmb = (CodedMacroblock) mblock;
+//                System.out.println("MBQPD " + i + ": " + cmb.getQpDelta());
                 qp = (qp + cmb.getQpDelta() + 52) % 52;
                 cmbs[i] = cmb;
             }

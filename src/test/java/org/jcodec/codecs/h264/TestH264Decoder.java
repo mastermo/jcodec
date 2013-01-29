@@ -4,13 +4,10 @@ import static org.jcodec.codecs.h264.io.model.NALUnitType.IDR_SLICE;
 import static org.jcodec.codecs.h264.io.model.NALUnitType.NON_IDR_SLICE;
 import static org.jcodec.common.NIOUtils.map;
 
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel.MapMode;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,7 +19,6 @@ import org.jcodec.codecs.h264.decode.aso.MBlockMapper;
 import org.jcodec.codecs.h264.decode.aso.MapManager;
 import org.jcodec.codecs.h264.decode.deblock.DeblockingFilter;
 import org.jcodec.codecs.h264.decode.deblock.FilterParameter;
-import org.jcodec.codecs.h264.decode.dpb.DecodedPicture;
 import org.jcodec.codecs.h264.decode.imgop.Flattener;
 import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
 import org.jcodec.codecs.h264.decode.model.DecodedSlice;
@@ -33,11 +29,9 @@ import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.codecs.h264.io.read.CAVLCReader;
 import org.jcodec.codecs.h264.io.read.SliceDataReader;
 import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.codecs.util.PGMIO;
-import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
@@ -283,7 +277,7 @@ public class TestH264Decoder extends JAVCTestCase {
 
         Picture pic1 = readFrame(pathForYPred, pathForCbPred, pathForCrPred);
 
-        DecodedPicture[] predFrame = new DecodedPicture[] { new DecodedPicture(pic1, 46, true, true, 23, false, false) };
+        Picture[] predFrame = new Picture[] { pic1 };
         Picture frame = decodePFrame(basePath + "test.264", predFrame, 24);
 
         Picture ref = readFrame(pathForY, pathForCb, pathForCr);
@@ -304,7 +298,7 @@ public class TestH264Decoder extends JAVCTestCase {
 
         Picture pic1 = readFrame(pathForYPred, pathForCbPred, pathForCrPred);
 
-        DecodedPicture[] predFrame = new DecodedPicture[] { new DecodedPicture(pic1, 298, true, true, 149, false, false) };
+        Picture[] predFrame = new Picture[] { pic1 };
         Picture frame = decodePFrame(basePath + "test.264", predFrame, 150);
 
         Picture ref = readFrame(pathForY, pathForCb, pathForCr);
@@ -324,7 +318,7 @@ public class TestH264Decoder extends JAVCTestCase {
         String pathForCrPred = basePath + "ref_d158cr.pgm";
 
         Picture pic1 = readFrame(pathForYPred, pathForCbPred, pathForCrPred);
-        DecodedPicture[] predFrame = new DecodedPicture[] { new DecodedPicture(pic1, 316, true, true, 158, false, false) };
+        Picture[] predFrame = new Picture[] { pic1 };
         Picture frame = decodePFrame(basePath + "test.264", predFrame, 159);
 
         Picture ref = readFrame(pathForY, pathForCb, pathForCr);
@@ -344,7 +338,7 @@ public class TestH264Decoder extends JAVCTestCase {
         String pathForCrPred = basePath + "ref_d470cr.pgm";
 
         Picture pic1 = readFrame(pathForYPred, pathForCbPred, pathForCrPred);
-        DecodedPicture[] predFrame = new DecodedPicture[] { new DecodedPicture(pic1, 940, true, true, 470, false, false) };
+        Picture[] predFrame = new Picture[] { pic1 };
         Picture frame = decodePFrame(basePath + "test.264", predFrame, 471);
 
         Picture ref = readFrame(pathForY, pathForCb, pathForCr);
@@ -370,8 +364,7 @@ public class TestH264Decoder extends JAVCTestCase {
 
         Picture pic1 = readFrame(pathForYPred0, pathForCbPred0, pathForCrPred0);
         Picture pic2 = readFrame(pathForYPred1, pathForCbPred1, pathForCrPred1);
-        DecodedPicture[] predFrame = new DecodedPicture[] { new DecodedPicture(pic1, 2, true, true, 1, false, false),
-                new DecodedPicture(pic2, 0, true, true, 0, false, false) };
+        Picture[] predFrame = new Picture[] { pic1, pic2 };
         Picture frame = decodePFrame(basePath + "test.264", predFrame, 2);
 
         Picture ref = readFrame(pathForY, pathForCb, pathForCr);
@@ -391,7 +384,7 @@ public class TestH264Decoder extends JAVCTestCase {
         for (int i = 0;; i++) {
             System.out.println("---" + i);
 
-            frame = decoder.decodeFrame(es.nextFrame(), buf.getData());
+            frame = decoder.decodeFrame(es.nextFrame().getData(), buf.getData());
             if (frame == null)
                 break;
 
@@ -418,7 +411,7 @@ public class TestH264Decoder extends JAVCTestCase {
         Picture frame = null;
         for (int i = 0;; i++) {
             System.out.println("\n\n" + i + "\n\n");
-            frame = decoder.decodeFrame(es.nextFrame(), buf.getData());
+            frame = decoder.decodeFrame(es.nextFrame().getData(), buf.getData());
             if (frame == null)
                 break;
             String pathForY = basePath + "ref_d" + i + "y.pgm";
@@ -446,7 +439,7 @@ public class TestH264Decoder extends JAVCTestCase {
 
             System.out.println("\n\n" + i + "\n\n");
 
-            frame = decoder.decodeFrame(es.nextFrame(), buf.getData());
+            frame = decoder.decodeFrame(es.nextFrame().getData(), buf.getData());
             if (frame == null)
                 break;
 
@@ -461,7 +454,7 @@ public class TestH264Decoder extends JAVCTestCase {
         }
     }
 
-    private Picture decodePFrame(String h264Path, DecodedPicture[] refFrame, int frameNo) throws IOException {
+    private Picture decodePFrame(String h264Path, Picture[] refFrame, int frameNo) throws IOException {
 
         final Map<Integer, SeqParameterSet> spsSet = new HashMap<Integer, SeqParameterSet>();
         final Map<Integer, PictureParameterSet> ppsSet = new HashMap<Integer, PictureParameterSet>();
@@ -509,14 +502,12 @@ public class TestH264Decoder extends JAVCTestCase {
         DecodedMBlock[] mblocks = new DecodedMBlock[10000];
 
         SliceHeader sh = sliceHeader;
-        DecodedPicture[] references = new DecodedPicture[0];
+        Picture[] references = new Picture[0];
         while (true) {
 
             MBlockMapper mBlockMap = mapManager.getMapper(sh);
 
             Macroblock[] macroblocks = dataReader.read(reader, sh, mBlockMap);
-
-            CAVLCReader.readTrailingBits(reader);
 
             CodedSlice cs = new CodedSlice(sh, macroblocks);
 
@@ -570,7 +561,7 @@ public class TestH264Decoder extends JAVCTestCase {
         Picture frame = null;
         for (int i = 0; i <= n; i++) {
 
-            frame = decoder.decodeFrame(es.nextFrame(), buf.getData());
+            frame = decoder.decodeFrame(es.nextFrame().getData(), buf.getData());
             if (frame == null)
                 break;
         }

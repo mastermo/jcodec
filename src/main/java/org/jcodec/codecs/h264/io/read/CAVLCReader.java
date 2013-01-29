@@ -100,18 +100,7 @@ public class CAVLCReader {
         return count;
     }
 
-    public static void readTrailingBits(BitReader bits)  {
-        bits.read1Bit();
-        bits.align();
-    }
-
     public static boolean moreRBSPData(BitReader bits)  {
-        if (!bits.moreData())
-            return false;
-        int bitsRem = 8 - bits.curBit();
-        if (bits.lastByte() && bits.checkNBit(bitsRem) == (1 << (bitsRem - 1)))
-            return false;
-
-        return true;
+        return !(bits.remaining() < 32 && bits.checkNBit(1) == 1 && (bits.checkNBit(24) << 9) == 0);
     }
 }

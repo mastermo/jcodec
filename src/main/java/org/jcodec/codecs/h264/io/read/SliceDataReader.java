@@ -105,8 +105,7 @@ public class SliceDataReader {
 
             MBlockNeighbourhood neighbourhood = calcNeighbourhood(i, mblocks, mBlockMap);
 
-            // println("*********** POC: X (I/P) MB: " + currMbAddr
-            // + " Slice: X Type X **********");
+//            System.out.println("*********** POC: X (I/P) MB: " + i + " Slice: X Type X **********");
 
             int mbType = readUE(in, "MB: mb_type");
 

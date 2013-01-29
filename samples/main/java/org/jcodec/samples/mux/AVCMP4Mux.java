@@ -13,6 +13,7 @@ import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
 import org.jcodec.common.NIOUtils;
+import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Size;
 import org.jcodec.containers.mp4.MP4Muxer;
 import org.jcodec.containers.mp4.MP4Muxer.CompressedTrack;
@@ -59,25 +60,28 @@ public class AVCMP4Mux {
 
         AvcCBox avcCBox = new AvcCBox();
 
-        ByteBuffer frame = null;
+        Packet frame = null;
         int i = 0;
         do {
             frame = es.nextFrame();
             if (frame == null)
                 continue;
-            NALUnit nu = NALUnit.read(frame);
+            ByteBuffer data = frame.getData();
+            NALUnit nu = NALUnit.read(data);
             if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
 
-                track.addFrame(new MP4Packet(formPacket(nu, frame), i, 25, 1, i, nu.type == NALUnitType.IDR_SLICE,
-                        null, i, 0));
+                MP4Packet pkt = new MP4Packet(formPacket(nu, data), i, 25, 1, i, nu.type == NALUnitType.IDR_SLICE,
+                        null, i, 0);
+                pkt.setDisplayOrder(frame.getDisplayOrder());
+                track.addFrame(pkt);
                 i++;
             } else if (nu.type == NALUnitType.SPS) {
-                avcCBox.getSpsList().add(frame);
+                avcCBox.getSpsList().add(data);
                 if (avcCBox.getSpsList().size() == 1) {
-                    addSampleEntry(track, SeqParameterSet.read(frame.duplicate()));
+                    addSampleEntry(track, SeqParameterSet.read(data.duplicate()));
                 }
             } else if (nu.type == NALUnitType.PPS) {
-                avcCBox.getPpsList().add(frame);
+                avcCBox.getPpsList().add(data);
             }
         } while (frame != null);
     }

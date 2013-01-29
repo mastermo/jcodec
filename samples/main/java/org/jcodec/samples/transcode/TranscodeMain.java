@@ -17,15 +17,12 @@ import java.util.EnumSet;
 
 import javax.imageio.ImageIO;
 
-import org.apache.commons.io.IOUtils;
+import org.jcodec.codecs.h264.H264Decoder;
 import org.jcodec.codecs.h264.H264Encoder;
 import org.jcodec.codecs.h264.annexb.H264Utils;
-import org.jcodec.codecs.h264.annexb.MappedH264ES;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
-import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
-import org.jcodec.codecs.h264.io.model.SliceHeader;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
 import org.jcodec.codecs.prores.ProresDecoder;
 import org.jcodec.codecs.prores.ProresEncoder;
@@ -39,20 +36,22 @@ import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
 import org.jcodec.containers.mp4.Brand;
 import org.jcodec.containers.mp4.MP4Demuxer;
-import org.jcodec.containers.mp4.TrackType;
 import org.jcodec.containers.mp4.MP4Demuxer.DemuxerTrack;
 import org.jcodec.containers.mp4.MP4Demuxer.FramesTrack;
 import org.jcodec.containers.mp4.MP4DemuxerException;
 import org.jcodec.containers.mp4.MP4Muxer;
 import org.jcodec.containers.mp4.MP4Muxer.CompressedTrack;
-import org.jcodec.containers.mp4.MP4Muxer.MuxerTrack;
+import org.jcodec.containers.mp4.MP4Packet;
+import org.jcodec.containers.mp4.TrackType;
+import org.jcodec.containers.mp4.boxes.Box;
+import org.jcodec.containers.mp4.boxes.LeafBox;
 import org.jcodec.containers.mp4.boxes.SampleEntry;
 import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
-import org.jcodec.containers.mp4.MP4Packet;
 import org.jcodec.scale.AWTUtil;
 import org.jcodec.scale.RgbToYuv420;
 import org.jcodec.scale.RgbToYuv422;
 import org.jcodec.scale.Transform;
+import org.jcodec.scale.Yuv420pToRgb;
 import org.jcodec.scale.Yuv420pToYuv422p;
 import org.jcodec.scale.Yuv422pToRgb;
 import org.jcodec.scale.Yuv422pToYuv420p;
@@ -90,16 +89,147 @@ public class TranscodeMain {
             png2avc(args[1], args[2]);
         } else if ("prores2avc".equals(args[0])) {
             prores2avc(args[1], args[2]);
+        } else if ("avc2png".equals(args[0])) {
+            avc2png(args[1], args[2]);
+        } else if ("avc2prores".equals(args[0])) {
+            avc2prores(args[1], args[2]);
+        }
+    }
+
+    private static void avc2prores(String in, String out) throws IOException {
+        FileChannel sink = null;
+        FileChannel source = null;
+        try {
+            source = new FileInputStream(new File(in)).getChannel();
+            sink = new FileOutputStream(new File(out)).getChannel();
+
+            MP4Demuxer demux = new MP4Demuxer(source);
+            MP4Muxer muxer = new MP4Muxer(sink, Brand.MOV);
+
+            H264Decoder decoder = new H264Decoder();
+            ProresEncoder encoder = new ProresEncoder(Profile.HQ);
+
+            Transform transform = new Yuv420pToYuv422p(2, 0);
+
+            DemuxerTrack inTrack = demux.getVideoTrack();
+            VideoSampleEntry ine = (VideoSampleEntry) inTrack.getSampleEntries()[0];
+
+            int width = (ine.getWidth() + 8) & ~0xf;
+            int height = (ine.getHeight() + 8) & ~0xf;
+
+            CompressedTrack outTrack = muxer.addVideoTrack("apch", new Size(width, height), APPLE_PRO_RES_422,
+                    (int) inTrack.getTimescale());
+
+            Picture target1 = Picture.create(width, height, ColorSpace.YUV420);
+            Picture target2 = Picture.create(width, height, ColorSpace.YUV422_10);
+
+            AvcCBox avcC = Box.as(AvcCBox.class, Box.findFirst(ine, LeafBox.class, "avcC"));
+            decoder.addSps(avcC.getSpsList());
+            decoder.addPps(avcC.getPpsList());
+
+            ByteBuffer _out = ByteBuffer.allocate(ine.getWidth() * ine.getHeight() * 6);
+
+            MP4Packet inFrame;
+            int totalFrames = (int) inTrack.getFrameCount();
+            for (int i = 0; (inFrame = inTrack.getFrames(1)) != null; i++) {
+                ByteBuffer data = inFrame.getData();
+                decodeData(data);
+                Picture dec = decoder.decodeFrame(data, target1.getData());
+
+                transform.transform(dec, target2);
+                _out.clear();
+                ByteBuffer result = encoder.encodeFrame(_out, target2);
+                outTrack.addFrame(new MP4Packet(inFrame, result));
+
+                if (i % 100 == 0)
+                    System.out.println((i * 100 / totalFrames) + "%");
+            }
+            muxer.writeHeader();
+        } finally {
+            if (sink != null)
+                sink.close();
+            if (source != null)
+                source.close();
+        }
+    }
+
+    private static void avc2png(String in, String out) throws IOException {
+        FileChannel sink = null;
+        FileChannel raw = null;
+        FileChannel source = null;
+        try {
+            source = new FileInputStream(new File(in)).getChannel();
+            sink = new FileOutputStream(new File(out)).getChannel();
+            raw = new FileOutputStream(new File(System.getProperty("user.home"), "/Desktop/super.264")).getChannel();
+
+            MP4Demuxer demux = new MP4Demuxer(source);
+            MP4Muxer muxer = new MP4Muxer(sink, Brand.MOV);
+
+            H264Decoder decoder = new H264Decoder();
+
+            Transform transform = new Yuv420pToRgb(0, 0);
+
+            DemuxerTrack inTrack = demux.getVideoTrack();
+
+            VideoSampleEntry ine = (VideoSampleEntry) inTrack.getSampleEntries()[0];
+            Picture target1 = Picture.create(ine.getWidth(), ine.getHeight(), ColorSpace.YUV420);
+            Picture rgb = Picture.create(ine.getWidth(), ine.getHeight(), ColorSpace.RGB);
+            ByteBuffer _out = ByteBuffer.allocate(ine.getWidth() * ine.getHeight() * 6);
+            BufferedImage bi = new BufferedImage(ine.getWidth(), ine.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
+            AvcCBox avcC = Box.as(AvcCBox.class, Box.findFirst(ine, LeafBox.class, "avcC"));
+
+            for (ByteBuffer byteBuffer : avcC.getSpsList()) {
+                raw.write(ByteBuffer.wrap(new byte[] { 0, 0, 0, 1, 0x67 }));
+                raw.write(byteBuffer.duplicate());
+            }
+            for (ByteBuffer byteBuffer : avcC.getPpsList()) {
+                raw.write(ByteBuffer.wrap(new byte[] { 0, 0, 0, 1, 0x68 }));
+                raw.write(byteBuffer.duplicate());
+            }
+
+            decoder.addSps(avcC.getSpsList());
+            decoder.addPps(avcC.getPpsList());
+
+            MP4Packet inFrame;
+            int totalFrames = (int) inTrack.getFrameCount();
+            for (int i = 0; (inFrame = inTrack.getFrames(1)) != null; i++) {
+                System.out.println("===================== FRAME " + i + " =====================");
+                ByteBuffer data = inFrame.getData();
+                decodeData(data);
+                raw.write(data.duplicate());
+                Picture dec = decoder.decodeFrame(data, target1.getData());
+                transform.transform(dec, rgb);
+                _out.clear();
+
+                AWTUtil.toBufferedImage(rgb, bi);
+                ImageIO.write(bi, "png", new File(format(out, i++)));
+                if (i % 100 == 0)
+                    System.out.println((i * 100 / totalFrames) + "%");
+            }
+        } finally {
+            if (sink != null)
+                sink.close();
+            if (source != null)
+                source.close();
+            if (raw != null)
+                raw.close();
+        }
+    }
+
+    private static void decodeData(ByteBuffer buf) {
+        ByteBuffer dup = buf.duplicate();
+        while (dup.hasRemaining()) {
+            int len = dup.duplicate().getInt();
+            dup.putInt(1);
+            NIOUtils.skip(dup, len);
         }
     }
 
     private static void prores2avc(String in, String out) throws IOException {
         FileChannel sink = null;
-        FileChannel raw = null;
         FileChannel source = null;
         try {
             sink = new FileOutputStream(new File(out)).getChannel();
-            raw = new FileOutputStream(new File("/Users/stan/Desktop/cool.264")).getChannel();
             source = new FileInputStream(new File(in)).getChannel();
 
             MP4Demuxer demux = new MP4Demuxer(source);
@@ -121,26 +251,23 @@ public class TranscodeMain {
             ArrayList<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
             ArrayList<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
             MP4Packet inFrame;
-            int totalFrames = (int)inTrack.getFrameCount();
+            int totalFrames = (int) inTrack.getFrameCount();
             for (int i = 0; (inFrame = inTrack.getFrames(1)) != null; i++) {
                 Picture dec = decoder.decodeFrame(inFrame.getData(), target1.getData());
                 transform.transform(dec, target2);
                 _out.clear();
                 ByteBuffer result = encoder.encodeFrame(_out, target2);
-                raw.write(result.duplicate());
                 spsList.clear();
                 ppsList.clear();
                 processFrame(result, spsList, ppsList);
                 outTrack.addFrame(new MP4Packet(inFrame, result));
-                if(i % 100 == 0)
+                if (i % 100 == 0)
                     System.out.println((i * 100 / totalFrames) + "%");
             }
             outTrack.addSampleEntry(createSampleEntry(spsList, ppsList));
 
             muxer.writeHeader();
         } finally {
-            if (raw != null)
-                raw.close();
             if (sink != null)
                 sink.close();
             if (source != null)

@@ -79,22 +79,22 @@ public class IntraMBlockReader extends CodedMblockReader {
         int[] lumaLeft = neighbourhood.getLumaLeft();
         int[] lumaTop = neighbourhood.getLumaTop();
 
-        pred[16] = lumaLeft != null ? lumaLeft[5] : null;
-        pred[17] = lumaLeft != null ? lumaLeft[7] : null;
-        pred[18] = lumaLeft != null ? lumaLeft[13] : null;
-        pred[19] = lumaLeft != null ? lumaLeft[15] : null;
-        pred[20] = lumaTop != null ? lumaTop[10] : null;
-        pred[21] = lumaTop != null ? lumaTop[11] : null;
-        pred[22] = lumaTop != null ? lumaTop[14] : null;
-        pred[23] = lumaTop != null ? lumaTop[15] : null;
+        pred[16] = lumaLeft != null ? lumaLeft[5] : 0;
+        pred[17] = lumaLeft != null ? lumaLeft[7] : 0;
+        pred[18] = lumaLeft != null ? lumaLeft[13] : 0;
+        pred[19] = lumaLeft != null ? lumaLeft[15] : 0;
+        pred[20] = lumaTop != null ? lumaTop[10] : 0;
+        pred[21] = lumaTop != null ? lumaTop[11] : 0;
+        pred[22] = lumaTop != null ? lumaTop[14] : 0;
+        pred[23] = lumaTop != null ? lumaTop[15] : 0;
 
         int[] tokens = new int[16];
 
         boolean[] leftAvailable = new boolean[] { neighbourhood.isLeftAvailable(), true,
                 neighbourhood.isLeftAvailable(), true, true, true, true, true, neighbourhood.isLeftAvailable(), true,
                 neighbourhood.isLeftAvailable(), true, true, true, true, true };
-        boolean[] topAvailable = new boolean[] { neighbourhood.isLeftAvailable(), neighbourhood.isLeftAvailable(),
-                true, true, neighbourhood.isLeftAvailable(), neighbourhood.isLeftAvailable(), true, true, true, true,
+        boolean[] topAvailable = new boolean[] { neighbourhood.isTopAvailable(), neighbourhood.isTopAvailable(),
+                true, true, neighbourhood.isTopAvailable(), neighbourhood.isTopAvailable(), true, true, true, true,
                 true, true, true, true, true, true };
 
         int chromaPredictionMode = readUE(reader, "MBP: intra_chroma_pred_mode");

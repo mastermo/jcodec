@@ -130,7 +130,12 @@ public class BitReader {
             deficit -= 8;
             curInt |= nextIgnore() << deficit;
         }
-        return curInt >>> (32 - n);
+        int res = curInt >>> (32 - n);
+//        for (int i = n - 1; i >= 0; i--) {
+//            System.out.print((res >> i) & 0x1);
+//        }
+//        System.out.println();
+        return res;
     }
 
     private int nextIgnore() {

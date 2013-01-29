@@ -21,7 +21,7 @@ public class TestIFrame extends TestCase {
         MappedH264ES reader = new MappedH264ES(map(path));
         H264Decoder decoder = new H264Decoder();
         Picture buf = Picture.create(1920, 1088, ColorSpace.YUV420);
-        decoder.decodeFrame(reader.nextFrame(), buf.getData());
+        decoder.decodeFrame(reader.nextFrame().getData(), buf.getData());
     }
 
     public void testCabac() {

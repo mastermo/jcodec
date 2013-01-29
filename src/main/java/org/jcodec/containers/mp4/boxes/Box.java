@@ -112,4 +112,14 @@ public abstract class Box {
     protected void dump(StringBuilder sb) {
         sb.append("'" + header.getFourcc() + "'");
     }
+
+    public static <T extends Box> T as(Class<T> class1, LeafBox box) {
+        try {
+            T res = class1.getConstructor(Header.class).newInstance(box.getHeader());
+            res.parse(box.getData());
+            return res;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

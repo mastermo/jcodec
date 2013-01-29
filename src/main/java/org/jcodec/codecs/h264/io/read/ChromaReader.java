@@ -155,10 +155,10 @@ public class ChromaReader {
     private BlocksWithTokens readChromaAC420(BitReader reader, int[] left, int[] top, boolean b, boolean c) {
 
         int[] pred = new int[8];
-        pred[4] = left != null ? left[1] : null;
-        pred[5] = left != null ? left[3] : null;
-        pred[6] = top != null ? top[2] : null;
-        pred[7] = top != null ? top[3] : null;
+        pred[4] = left != null ? left[1] : 0;
+        pred[5] = left != null ? left[3] : 0;
+        pred[6] = top != null ? top[2] : 0;
+        pred[7] = top != null ? top[3] : 0;
 
         return readChromaACSub(reader, pred, 1, mappingLeft2x2, mappingTop2x2, b, c);
     }
@@ -176,8 +176,8 @@ public class ChromaReader {
             for (int i4x4 = 0; i4x4 < 4; i4x4++) {
                 int blkAddr = i8x8 * 4 + i4x4;
 
-                VLC coeffTokenTable = cavlcReader.getCoeffTokenVLCForLuma(la[blkAddr], pred[mappingLeft4x4[blkAddr]],
-                        ta[blkAddr], pred[mappingTop4x4[blkAddr]]);
+                VLC coeffTokenTable = cavlcReader.getCoeffTokenVLCForLuma(la[blkAddr], pred[mapLeft[blkAddr]],
+                        ta[blkAddr], pred[mapTop[blkAddr]]);
 
                 int[] coeff = new int[15];
                 int readCoeffs = cavlcReader.readCoeffs(reader, coeffTokenTable, H264Const.totalZeros16, coeff);

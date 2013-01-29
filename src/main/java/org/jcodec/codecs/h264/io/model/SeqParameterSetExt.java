@@ -1,7 +1,6 @@
 package org.jcodec.codecs.h264.io.model;
 
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readTrailingBits;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeTrailingBits;
@@ -45,8 +44,6 @@ public class SeqParameterSetExt extends BitstreamElement {
             spse.alpha_transparent_value = readU(in, spse.bit_depth_aux_minus8 + 9, "SPSE: alpha_transparent_value");
         }
         spse.additional_extension_flag = readBool(in, "SPSE: additional_extension_flag");
-
-        readTrailingBits(in);
 
         return spse;
     }

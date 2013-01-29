@@ -159,8 +159,6 @@ public class SeqParameterSet extends BitstreamElement {
         if (vui_parameters_present_flag)
             sps.vuiParams = readVUIParameters(in);
 
-        CAVLCReader.readTrailingBits(in);
-
         return sps;
     }
 
