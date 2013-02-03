@@ -5,6 +5,10 @@ import static org.jcodec.common.model.ColorSpace.RGB;
 import static org.jcodec.common.model.Rational.HALF;
 import static org.jcodec.common.model.Unit.SEC;
 
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -34,6 +38,7 @@ import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
+import org.jcodec.common.tools.MathUtil;
 import org.jcodec.containers.mp4.Brand;
 import org.jcodec.containers.mp4.MP4Demuxer;
 import org.jcodec.containers.mp4.MP4Demuxer.DemuxerTrack;
@@ -93,7 +98,92 @@ public class TranscodeMain {
             avc2png(args[1], args[2]);
         } else if ("avc2prores".equals(args[0])) {
             avc2prores(args[1], args[2]);
+        } else if ("avc2embed".equals(args[0])) {
+            avcEmbed(args[1], args[2], args[3]);
         }
+    }
+
+    private static void avcEmbed(String in, String out, String text) throws IOException {
+        FileChannel sink = null;
+        FileChannel source = null;
+        try {
+            source = new FileInputStream(new File(in)).getChannel();
+            sink = new FileOutputStream(new File(out)).getChannel();
+
+            MP4Demuxer demux = new MP4Demuxer(source);
+            MP4Muxer muxer = new MP4Muxer(sink, Brand.MOV);
+
+            H264Decoder decoder = new H264Decoder();
+            H264Encoder encoder = new H264Encoder();
+
+            DemuxerTrack inTrack = demux.getVideoTrack();
+            VideoSampleEntry ine = (VideoSampleEntry) inTrack.getSampleEntries()[0];
+
+            int width = (ine.getWidth() + 8) & ~0xf;
+            int height = (ine.getHeight() + 8) & ~0xf;
+
+            CompressedTrack outTrack = muxer.addTrackForCompressed(TrackType.VIDEO, (int) inTrack.getTimescale());
+
+            Picture target1 = Picture.create(width, height, ColorSpace.YUV420);
+
+            AvcCBox avcC = Box.as(AvcCBox.class, Box.findFirst(ine, LeafBox.class, "avcC"));
+            decoder.addSps(avcC.getSpsList());
+            decoder.addPps(avcC.getPpsList());
+
+            Picture mask = prepareMask(width, height, text);
+
+            ByteBuffer _out = ByteBuffer.allocate(ine.getWidth() * ine.getHeight() * 6);
+
+            ArrayList<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
+            ArrayList<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
+            MP4Packet inFrame;
+            int totalFrames = (int) inTrack.getFrameCount();
+            for (int i = 0; (inFrame = inTrack.getFrames(1)) != null; i++) {
+                ByteBuffer data = inFrame.getData();
+                decodeData(data);
+                Picture dec = decoder.decodeFrame(data, target1.getData());
+                putMask(dec, mask);
+                _out.clear();
+                ByteBuffer result = encoder.encodeFrame(_out, dec);
+                spsList.clear();
+                ppsList.clear();
+                processFrame(result, spsList, ppsList);
+                outTrack.addFrame(new MP4Packet(inFrame, result));
+
+                if (i % 100 == 0)
+                    System.out.println((i * 100 / totalFrames) + "%");
+            }
+            outTrack.addSampleEntry(createSampleEntry(spsList, ppsList));
+            muxer.writeHeader();
+        } finally {
+            if (sink != null)
+                sink.close();
+            if (source != null)
+                source.close();
+        }
+    }
+
+    private static void putMask(Picture dec, Picture mask) {
+        int[] src = dec.getPlaneData(0);
+        int[] m = mask.getPlaneData(0);
+        for (int j = 0, i = 0; j < src.length; j++, i += 3)
+            src[j] = MathUtil.clip((src[j] * m[i]) >> 7, 0, 255);
+    }
+
+    private static Picture prepareMask(int width, int height, String text) {
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D g2d = img.createGraphics();
+
+        g2d.setPaint(new Color(128, 128, 128));
+        g2d.fillRect(0, 0, width, height);
+        g2d.setPaint(new Color(224, 224, 224));
+        g2d.setFont(new Font("Verdana", Font.PLAIN, 20));
+        FontMetrics fm = g2d.getFontMetrics();
+        g2d.drawString(text, 60, 60);
+        g2d.drawString(text, img.getWidth() - fm.stringWidth(text) - 60, height - 60);
+        Picture result = AWTUtil.fromBufferedImage(img);
+        g2d.dispose();
+        return result;
     }
 
     private static void avc2prores(String in, String out) throws IOException {
