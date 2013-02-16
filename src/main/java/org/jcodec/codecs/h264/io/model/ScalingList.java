@@ -1,6 +1,6 @@
 package org.jcodec.codecs.h264.io.model;
 
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readSE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeSE;
 
 import org.jcodec.common.io.BitReader;

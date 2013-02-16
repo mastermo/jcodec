@@ -356,8 +356,8 @@ public class H264Const {
 
             new VLCBuilder().set(0, "1").set(1, "011").set(2, "010").set(3, "0011").set(4, "0010").set(5, "00011")
                     .set(6, "00010").set(7, "000011").set(8, "000010").set(9, "0000011").set(10, "0000010")
-                    .set(11, "00000011").set(12, "00000010").set(13, "000000011").set(14, "000000010").set(15, "000000001")
-                    .getVLC(),
+                    .set(11, "00000011").set(12, "00000010").set(13, "000000011").set(14, "000000010")
+                    .set(15, "000000001").getVLC(),
 
             new VLCBuilder().set(0, "111").set(1, "110").set(2, "101").set(3, "100").set(4, "011").set(5, "0101")
                     .set(6, "0100").set(7, "0011").set(8, "0010").set(9, "00011").set(10, "00010").set(11, "000011")
@@ -372,7 +372,8 @@ public class H264Const {
                     .set(12, "00000").getVLC(),
 
             new VLCBuilder().set(0, "0101").set(1, "0100").set(2, "0011").set(3, "111").set(4, "110").set(5, "101")
-                    .set(6, "100").set(7, "011").set(8, "0010").set(9, "00001").set(10, "0001").set(11, "00000").getVLC(),
+                    .set(6, "100").set(7, "011").set(8, "0010").set(9, "00001").set(10, "0001").set(11, "00000")
+                    .getVLC(),
 
             new VLCBuilder().set(0, "000001").set(1, "00001").set(2, "111").set(3, "110").set(4, "101").set(5, "100")
                     .set(6, "011").set(7, "010").set(8, "0001").set(9, "001").set(10, "000000").getVLC(),
@@ -422,4 +423,43 @@ public class H264Const {
             new VLCBuilder().set(0, "00").set(1, "01").set(2, "1").getVLC(),
 
             new VLCBuilder().set(0, "0").set(1, "1").getVLC() };
+
+    public static enum PartPred {
+        L0, L1, Bi, Direct;
+    }
+
+    public static PartPred[][] bPredModes = { null, { PartPred.L0 }, { PartPred.L1 }, { PartPred.Bi },
+            { PartPred.L0, PartPred.L0 }, { PartPred.L0, PartPred.L0 }, { PartPred.L1, PartPred.L1 },
+            { PartPred.L1, PartPred.L1 }, { PartPred.L0, PartPred.L1 }, { PartPred.L0, PartPred.L1 },
+            { PartPred.L1, PartPred.L0 }, { PartPred.L1, PartPred.L0 }, { PartPred.L0, PartPred.Bi },
+            { PartPred.L0, PartPred.Bi }, { PartPred.L1, PartPred.Bi }, { PartPred.L1, PartPred.Bi },
+            { PartPred.Bi, PartPred.L0 }, { PartPred.Bi, PartPred.L0 }, { PartPred.Bi, PartPred.L1 },
+            { PartPred.Bi, PartPred.L1 }, { PartPred.Bi, PartPred.Bi }, { PartPred.Bi, PartPred.Bi } };
+
+    public static int[] bPartW = { 0, 16, 16, 16, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8 };
+    public static int[] bPartH = { 0, 16, 16, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16, 8, 16 };
+
+    public static int[] BLK_X = new int[] { 0, 4, 0, 4, 8, 12, 8, 12, 0, 4, 0, 4, 8, 12, 8, 12 };
+    public static int[] BLK_Y = new int[] { 0, 0, 4, 4, 0, 0, 4, 4, 8, 8, 12, 12, 8, 8, 12, 12 };
+
+    public static int[] MB_BLK_OFF_LEFT = new int[] { 0, 1, 0, 1, 2, 3, 2, 3, 0, 1, 0, 1, 2, 3, 2, 3 };
+    public static int[] MB_BLK_OFF_TOP = new int[] { 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3 };
+
+    public static final int[] QP_SCALE_CR = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+            21, 22, 23, 24, 25, 26, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34, 34, 35, 35, 36, 36, 37, 37, 37, 38, 38, 38,
+            39, 39, 39, 39 };
+
+    public static int[] CODED_BLOCK_PATTERN_INTRA_COLOR = new int[] { 47, 31, 15, 0, 23, 27, 29, 30, 7, 11, 13, 14, 39,
+            43, 45, 46, 16, 3, 5, 10, 12, 19, 21, 26, 28, 35, 37, 42, 44, 1, 2, 4, 8, 17, 18, 20, 24, 6, 9, 22, 25, 32,
+            33, 34, 36, 40, 38, 41 };
+
+    public static int[] coded_block_pattern_intra_monochrome = new int[] { 15, 0, 7, 11, 13, 14, 3, 5, 10, 12, 1, 2, 4,
+            8, 6, 9 };
+
+    public static int[] CODED_BLOCK_PATTERN_INTER_COLOR = new int[] { 0, 16, 1, 2, 4, 8, 32, 3, 5, 10, 12, 15, 47, 7,
+            11, 13, 14, 6, 9, 31, 35, 37, 42, 44, 33, 34, 36, 40, 39, 43, 45, 46, 17, 18, 20, 24, 19, 21, 26, 28, 23,
+            27, 29, 30, 22, 25, 38, 41 };
+
+    public static int[] coded_block_pattern_inter_monochrome = new int[] { 0, 1, 2, 4, 8, 3, 5, 10, 12, 15, 7, 11, 13,
+            14, 6, 9 };
 }

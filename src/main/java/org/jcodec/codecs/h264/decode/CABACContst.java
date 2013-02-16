@@ -1,4 +1,4 @@
-package org.jcodec.codecs.h264.io.read;
+package org.jcodec.codecs.h264.decode;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed

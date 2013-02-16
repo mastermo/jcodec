@@ -1,12 +1,12 @@
-package org.jcodec.codecs.h264.io.read;
+package org.jcodec.codecs.h264.decode;
 
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readBool;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readSE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readU;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readUE;
 import static org.jcodec.codecs.h264.io.model.RefPicReordering.InstrType.BACKWARD;
 import static org.jcodec.codecs.h264.io.model.RefPicReordering.InstrType.FORWARD;
 import static org.jcodec.codecs.h264.io.model.RefPicReordering.InstrType.LONG_TERM;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
 import static org.jcodec.common.model.ColorSpace.MONO;
 
 import java.util.ArrayList;

@@ -1,9 +1,10 @@
-package org.jcodec.codecs.h264.annexb;
+package org.jcodec.codecs.h264;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.nio.ByteBuffer;
 
+import org.jcodec.codecs.h264.decode.SliceHeaderReader;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
@@ -11,7 +12,7 @@ import org.jcodec.codecs.h264.io.model.RefPicMarking;
 import org.jcodec.codecs.h264.io.model.RefPicMarking.InstrType;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
+import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.Packet;
 
@@ -35,10 +36,12 @@ public class MappedH264ES {
     private int prevFrameNum;
     private int prevPicOrderCntMsb;
     private int prevPicOrderCntLsb;
+    private int frameNo;
 
     public MappedH264ES(ByteBuffer bb) {
         this.bb = bb;
         this.shr = new SliceHeaderReader();
+        this.frameNo = 0;
     }
 
     public Packet nextFrame() {
@@ -46,25 +49,23 @@ public class MappedH264ES {
 
         NALUnit prevNu = null;
         SliceHeader prevSh = null;
-        int poc = 0;
-        boolean keyFrame = false;
         while (true) {
             bb.mark();
             ByteBuffer buf = H264Utils.nextNALUnit(bb);
             if (buf == null)
                 break;
+            NIOUtils.skip(buf, 4);
             NALUnit nu = NALUnit.read(buf);
 
             if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
-                keyFrame = nu.type == NALUnitType.IDR_SLICE;
                 SliceHeader sh = readSliceHeader(buf, nu);
-                if (prevSh == null)
-                    poc = detectPoc(nu, sh);
 
                 if (prevNu != null && prevSh != null && !sameFrame(prevNu, nu, prevSh, sh)) {
                     bb.reset();
                     break;
                 }
+                prevSh = sh;
+                prevNu = nu;
             } else if (nu.type == NALUnitType.PPS) {
                 PictureParameterSet read = PictureParameterSet.read(buf);
                 pps.put(read.pic_parameter_set_id, read);
@@ -76,7 +77,7 @@ public class MappedH264ES {
 
         result.limit(bb.position());
 
-        return prevSh == null ? null : new Packet(result, 0, 1, 1, 0, keyFrame, null, poc);
+        return prevSh == null ? null : detectPoc(result, prevNu, prevSh);
     }
 
     private SliceHeader readSliceHeader(ByteBuffer buf, NALUnit nu) {
@@ -114,18 +115,19 @@ public class MappedH264ES {
         return true;
     }
 
-    private int detectPoc(NALUnit nu, SliceHeader sh) {
+    private Packet detectPoc(ByteBuffer result, NALUnit nu, SliceHeader sh) {
         int maxFrameNum = 1 << (sh.sps.log2_max_frame_num_minus4 + 4);
         if (detectGap(sh, maxFrameNum)) {
             issueNonExistingPic(sh, maxFrameNum);
         }
+        System.out.println("----" + sh.frame_num);
         int absFrameNum = updateFrameNumber(sh.frame_num, maxFrameNum, detectMMCO5(sh.refPicMarkingNonIDR));
 
         int poc = 0;
         if (nu.type == NALUnitType.NON_IDR_SLICE) {
             poc = calcPoc(absFrameNum, nu, sh);
         }
-        return poc;
+        return new Packet(result, absFrameNum, 1, 1, frameNo++, nu.type == NALUnitType.IDR_SLICE, null, poc);
     }
 
     private int updateFrameNumber(int frameNo, int maxFrameNum, boolean mmco5) {
@@ -230,5 +232,13 @@ public class MappedH264ES {
             }
         }
         return false;
+    }
+
+    public SeqParameterSet[] getSps() {
+        return sps.values(new SeqParameterSet[0]);
+    }
+
+    public PictureParameterSet[] getPps() {
+        return pps.values(new PictureParameterSet[0]);
     }
 }

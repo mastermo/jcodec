@@ -1,6 +1,11 @@
 package org.jcodec.codecs.h264;
 
-import static org.jcodec.codecs.h264.annexb.H264Utils.escapeNAL;
+import static org.jcodec.codecs.h264.H264Const.BLK_X;
+import static org.jcodec.codecs.h264.H264Const.BLK_Y;
+import static org.jcodec.codecs.h264.H264Const.MB_BLK_OFF_LEFT;
+import static org.jcodec.codecs.h264.H264Const.MB_BLK_OFF_TOP;
+import static org.jcodec.codecs.h264.H264Utils.escapeNAL;
+import static org.jcodec.codecs.h264.decode.CoeffTransformer.reorderDC4x4;
 import static org.jcodec.common.tools.MathUtil.clip;
 
 import java.nio.ByteBuffer;
@@ -35,18 +40,13 @@ import org.jcodec.common.model.Picture;
 public class H264Encoder {
 
     private static final int QP = 20;
-    private static int[] BLK_X = new int[] { 0, 4, 0, 4, 8, 12, 8, 12, 0, 4, 0, 4, 8, 12, 8, 12 };
-    private static int[] BLK_Y = new int[] { 0, 0, 4, 4, 0, 0, 4, 4, 8, 8, 12, 12, 8, 8, 12, 12 };
 
-    private int[][] tokensLeft;
-    private int[][] tokensTop;
-    private CAVLC cavlc;
+    private CAVLC[] cavlc;
     private CoeffTransformer coeffTransformer;
     private int[][] leftRow;
     private int[][] topLine;
 
     public H264Encoder() {
-        cavlc = new CAVLC(ColorSpace.YUV420);
         coeffTransformer = new CoeffTransformer(null);
     }
 
@@ -99,9 +99,6 @@ public class H264Encoder {
         sps.frame_mbs_only_flag = true;
         int mbWidth = sps.pic_width_in_mbs_minus1 + 1;
 
-        tokensLeft = new int[3][4];
-        tokensTop = new int[3][mbWidth << 2];
-
         leftRow = new int[][] { new int[16], new int[8], new int[8] };
         topLine = new int[][] { new int[mbWidth << 4], new int[mbWidth << 3], new int[mbWidth << 3] };
 
@@ -109,6 +106,7 @@ public class H264Encoder {
     }
 
     private void encodeSlice(SeqParameterSet sps, PictureParameterSet pps, Picture pic, ByteBuffer dup) {
+        cavlc = new CAVLC[] { new CAVLC(sps, pps, 2, 2), new CAVLC(sps, pps, 1, 1), new CAVLC(sps, pps, 1, 1) };
 
         dup.putInt(0x1);
         new NALUnit(NALUnitType.IDR_SLICE, 2).write(dup);
@@ -172,15 +170,15 @@ public class H264Encoder {
         int[] dc1 = extractDC(ac1);
         int[] dc2 = extractDC(ac2);
 
-        writeDC(1, mbX, mbY, out, qp, x, dc1);
-        writeDC(2, mbX, mbY, out, qp, x, dc2);
+        writeDC(1, mbX, mbY, out, qp, mbX << 1, mbY << 1, dc1);
+        writeDC(2, mbX, mbY, out, qp, mbX << 1, mbY << 1, dc2);
 
-        writeAC(1, mbX, mbY, out, x, ac1, qp);
-        writeAC(2, mbX, mbY, out, x, ac2, qp);
+        writeAC(1, mbX, mbY, out, mbX << 1, mbY << 1, ac1, qp);
+        writeAC(2, mbX, mbY, out, mbX << 1, mbY << 1, ac2, qp);
 
-        restorePlane(outMB, 1, dc1, ac1, qp);
+        restorePlane(dc1, ac1, qp);
         putChroma(outMB.getData()[1], 1, x, y, ac1);
-        restorePlane(outMB, 2, dc2, ac2, qp);
+        restorePlane(dc2, ac2, qp);
         putChroma(outMB.getData()[2], 2, x, y, ac2);
     }
 
@@ -189,10 +187,10 @@ public class H264Encoder {
         int y = mbY << 4;
         int[][] ac = transform(pic, 0, qp, 0, 0, x, y);
         int[] dc = extractDC(ac);
-        writeDC(0, mbX, mbY, out, qp, x, dc);
-        writeAC(0, mbX, mbY, out, x, ac, qp);
+        writeDC(0, mbX, mbY, out, qp, mbX << 2, mbY << 2, dc);
+        writeAC(0, mbX, mbY, out, mbX << 2, mbY << 2, ac, qp);
 
-        restorePlane(outMB, 0, dc, ac, qp);
+        restorePlane(dc, ac, qp);
         putLuma(outMB.getPlaneData(0), lumaDCPred(x, y), ac, 4);
     }
 
@@ -224,7 +222,7 @@ public class H264Encoder {
         }
     }
 
-    private void restorePlane(Picture outMB, int comp, int[] dc, int[][] ac, int qp) {
+    private void restorePlane(int[] dc, int[][] ac, int qp) {
         if (dc.length == 4) {
             coeffTransformer.invDC2x2(dc);
             coeffTransformer.dequantizeDC2x2(dc, qp);
@@ -243,13 +241,6 @@ public class H264Encoder {
         }
     }
 
-    private void reorderDC4x4(int[] dc) {
-        ArrayUtil.swap(dc, 2, 4);
-        ArrayUtil.swap(dc, 3, 5);
-        ArrayUtil.swap(dc, 10, 12);
-        ArrayUtil.swap(dc, 11, 13);
-    }
-
     private int[] extractDC(int[][] ac) {
         int[] dc = new int[ac.length];
         for (int i = 0; i < ac.length; i++) {
@@ -259,38 +250,32 @@ public class H264Encoder {
         return dc;
     }
 
-    private void writeAC(int comp, int mbX, int mbY, BitWriter out, int x, int[][] ac, int qp) {
+    private void writeAC(int comp, int mbX, int mbY, BitWriter out, int mbLeftBlk, int mbTopBlk, int[][] ac, int qp) {
         for (int i = 0; i < ac.length; i++) {
             coeffTransformer.quantizeAC(ac[i], qp);
-            int coeffToken = cavlc.writeBlock(
-                    out,
-                    ac[i],
-                    cavlc.getCoeffTokenVLCForLuma(mbX != 0 || BLK_X[i] != 0, tokensLeft[comp][BLK_Y[i] >> 2], mbY != 0
-                            || BLK_Y[i] != 0, tokensTop[comp][(x + BLK_X[i]) >> 2]), H264Const.totalZeros16, 1, 15,
-                    CoeffTransformer.zigzag4x4);
-            tokensLeft[comp][BLK_Y[i] >> 2] = coeffToken;
-            tokensTop[comp][(x + BLK_X[i]) >> 2] = coeffToken;
+            // TODO: calc here
+            cavlc[comp].writeACBlock(out, mbLeftBlk + MB_BLK_OFF_LEFT[i], mbTopBlk + MB_BLK_OFF_TOP[i], ac[i],
+                    H264Const.totalZeros16, 1, 15, CoeffTransformer.zigzag4x4);
         }
     }
 
-    private void writeDC(int comp, int mbX, int mbY, BitWriter out, int qp, int x, int[] dc) {
+    private void writeDC(int comp, int mbX, int mbY, BitWriter out, int qp, int mbLeftBlk, int mbTopBlk, int[] dc) {
         if (dc.length == 4) {
             coeffTransformer.quantizeDC2x2(dc, qp);
             coeffTransformer.fvdDC2x2(dc);
-            cavlc.writeBlock(out, dc, cavlc.getCoeffTokenVLCForChromaDC(), H264Const.totalZeros4, 0, dc.length,
-                    new int[] { 0, 1, 2, 3 });
+            cavlc[comp].writeChrDCBlock(out, dc, H264Const.totalZeros4, 0, dc.length, new int[] { 0, 1, 2, 3 });
         } else if (dc.length == 8) {
             coeffTransformer.quantizeDC4x2(dc, qp);
             coeffTransformer.fvdDC4x2(dc);
-            cavlc.writeBlock(out, dc, cavlc.getCoeffTokenVLCForChromaDC(), H264Const.totalZeros8, 0, dc.length,
-                    new int[] { 0, 1, 2, 3, 4, 5, 6, 7 });
+            cavlc[comp].writeChrDCBlock(out, dc, H264Const.totalZeros8, 0, dc.length, new int[] { 0, 1, 2, 3, 4, 5, 6,
+                    7 });
         } else {
             reorderDC4x4(dc);
             coeffTransformer.quantizeDC4x4(dc, qp);
             coeffTransformer.fvdDC4x4(dc);
-            cavlc.writeBlock(out, dc,
-                    cavlc.getCoeffTokenVLCForLuma(mbX != 0, tokensLeft[comp][0], mbY != 0, tokensTop[comp][x >> 2]),
-                    H264Const.totalZeros16, 0, 16, CoeffTransformer.zigzag4x4);
+            // TODO: calc here
+            cavlc[comp].writeLumaDCBlock(out, mbLeftBlk, mbTopBlk, dc, H264Const.totalZeros16, 0, 16,
+                    CoeffTransformer.zigzag4x4);
         }
     }
 

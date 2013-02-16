@@ -1,11 +1,11 @@
 package org.jcodec.codecs.h264.io.model;
 
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.moreRBSPData;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readNBit;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.moreRBSPData;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readBool;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readNBit;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readSE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readU;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readUE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeBool;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeNBit;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeSE;
@@ -30,7 +30,7 @@ import org.jcodec.common.io.BitWriter;
  * @author Jay Codec
  * 
  */
-public class PictureParameterSet extends BitstreamElement {
+public class PictureParameterSet {
 
     public static class PPSExt {
         public boolean transform_8x8_mode_flag;

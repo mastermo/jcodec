@@ -1,35 +1,23 @@
 package org.jcodec.codecs.h264;
 
-import static org.jcodec.codecs.h264.annexb.H264Utils.unescapeNAL;
+import static org.jcodec.codecs.h264.H264Utils.unescapeNAL;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jcodec.codecs.h264.annexb.H264Utils;
 import org.jcodec.codecs.h264.decode.SliceDecoder;
-import org.jcodec.codecs.h264.decode.aso.MBlockMapper;
-import org.jcodec.codecs.h264.decode.aso.MapManager;
+import org.jcodec.codecs.h264.decode.SliceHeaderReader;
 import org.jcodec.codecs.h264.decode.deblock.DeblockingFilter;
-import org.jcodec.codecs.h264.decode.deblock.FilterParameter;
-import org.jcodec.codecs.h264.decode.deblock.FilterParameterBuilder;
-import org.jcodec.codecs.h264.decode.imgop.Flattener;
-import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
-import org.jcodec.codecs.h264.decode.model.DecodedSlice;
-import org.jcodec.codecs.h264.io.model.CodedSlice;
-import org.jcodec.codecs.h264.io.model.Macroblock;
+import org.jcodec.codecs.h264.io.model.MBType;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.RefPicMarking;
 import org.jcodec.codecs.h264.io.model.RefPicMarkingIDR;
-import org.jcodec.codecs.h264.io.model.RefPicReordering;
-import org.jcodec.codecs.h264.io.model.RefPicReordering.ReorderOp;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.codecs.h264.io.read.SliceDataReader;
-import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.common.ArrayUtil;
 import org.jcodec.common.NIOUtils;
 import org.jcodec.common.VideoDecoder;
@@ -70,29 +58,30 @@ public class H264Decoder implements VideoDecoder {
         private SliceHeaderReader shr;
         private PictureParameterSet activePps;
         private SeqParameterSet activeSps;
-        private Picture result;
-        private SliceDataReader dataReader;
-        private MapManager mapManager;
-        private SliceDecoder sliceDecoder;
         private DeblockingFilter filter;
-        private int picWidthInMbs;
-        private int picHeightInMbs;
-        private DecodedMBlock[] mblocks;
-        private SliceHeader[] headers;
         private SliceHeader firstSliceHeader;
         private NALUnit firstNu;
+        private SliceDecoder decoder;
 
         public Picture decodeFrame(ByteBuffer data, int[][] buffer) {
+            Picture result = null;
+
+            List<SliceHeader> headers = new ArrayList<SliceHeader>();
             ByteBuffer segment;
             while ((segment = H264Utils.nextNALUnit(data)) != null) {
                 NIOUtils.skip(segment, 4);
                 NALUnit marker = NALUnit.read(segment);
+
+                unescapeNAL(segment);
+
                 switch (marker.type) {
                 case NON_IDR_SLICE:
                 case IDR_SLICE:
                     if (result == null)
                         init(buffer, segment, marker);
-                    decodeSlice(segment, marker);
+                    if (activePps.entropy_coding_mode_flag)
+                        throw new RuntimeException("CABAC!!!");
+                    headers.add(decoder.decode(segment, marker));
                     break;
                 case SPS:
                     SeqParameterSet _sps = SeqParameterSet.read(segment);
@@ -105,12 +94,9 @@ public class H264Decoder implements VideoDecoder {
                 default:
                 }
             }
-            FilterParameter[] dbfInput = buildDeblockerParams(activeSps.pic_width_in_mbs_minus1 + 1, mblocks, headers);
 
-            filter.applyDeblocking(mblocks, dbfInput);
-
-            Flattener.flattern(result, mblocks, activeSps.pic_width_in_mbs_minus1 + 1,
-                    activeSps.pic_height_in_map_units_minus1 + 1);
+            for (SliceHeader sh : headers)
+                filter.deblockSlice(result, sh);
 
             updateReferences(result);
 
@@ -127,7 +113,7 @@ public class H264Decoder implements VideoDecoder {
             }
         }
 
-        private void init(int[][] buffer, ByteBuffer segment, NALUnit marker) {
+        private Picture init(int[][] buffer, ByteBuffer segment, NALUnit marker) {
             firstNu = marker;
 
             shr = new SliceHeaderReader();
@@ -135,68 +121,21 @@ public class H264Decoder implements VideoDecoder {
             firstSliceHeader = shr.readPart1(br);
             activePps = pps.get(firstSliceHeader.pic_parameter_set_id);
             activeSps = sps.get(activePps.seq_parameter_set_id);
-            picWidthInMbs = activeSps.pic_width_in_mbs_minus1 + 1;
-            picHeightInMbs = activeSps.pic_height_in_map_units_minus1 + 1;
             shr.readPart2(firstSliceHeader, marker, activeSps, activePps, br);
-            result = createPicture(activeSps, buffer);
-            dataReader = new SliceDataReader(activePps.extended != null ? activePps.extended.transform_8x8_mode_flag
-                    : false, activeSps.chroma_format_idc, activePps.entropy_coding_mode_flag,
-                    activeSps.mb_adaptive_frame_field_flag, activeSps.frame_mbs_only_flag,
-                    activePps.num_slice_groups_minus1 + 1, activeSps.bit_depth_luma_minus8 + 8,
-                    activeSps.bit_depth_chroma_minus8 + 8, activePps.num_ref_idx_l0_active_minus1 + 1,
-                    activePps.num_ref_idx_l1_active_minus1 + 1, activePps.constrained_intra_pred_flag);
-            int[] chromaQpOffset = new int[] {
-                    activePps.chroma_qp_index_offset,
-                    activePps.extended != null ? activePps.extended.second_chroma_qp_index_offset
-                            : activePps.chroma_qp_index_offset };
+            int picWidthInMbs = activeSps.pic_width_in_mbs_minus1 + 1;
+            int picHeightInMbs = activeSps.pic_height_in_map_units_minus1 + 1;
 
-            sliceDecoder = new SliceDecoder(activePps.pic_init_qp_minus26 + 26, chromaQpOffset,
-                    activeSps.pic_width_in_mbs_minus1 + 1, activeSps.bit_depth_luma_minus8 + 8,
-                    activeSps.bit_depth_chroma_minus8 + 8, activePps.constrained_intra_pred_flag);
+            int[][] tokens = new int[3][picHeightInMbs * picHeightInMbs << 4];
+            int[][] mvs = new int[3][picHeightInMbs * picHeightInMbs << 4];
+            MBType[] mbTypes = new MBType[picHeightInMbs * picHeightInMbs];
+            int[][] mbQps = new int[3][picHeightInMbs * picHeightInMbs];
+            Picture result = createPicture(activeSps, buffer);
 
-            filter = new DeblockingFilter(activeSps.pic_width_in_mbs_minus1 + 1,
-                    activeSps.pic_height_in_map_units_minus1 + 1, activeSps.bit_depth_luma_minus8 + 8,
-                    activeSps.bit_depth_chroma_minus8 + 8);
-            mapManager = new MapManager(activeSps, activePps);
+            decoder = new SliceDecoder(activeSps, activePps, tokens, mvs, mbTypes, mbQps, result, references, nLongTerm);
 
-            int mblocksInFrame = picWidthInMbs * picHeightInMbs;
+            filter = new DeblockingFilter(picWidthInMbs, activeSps.bit_depth_chroma_minus8 + 8, tokens, mvs, mbTypes,
+                    mbQps);
 
-            mblocks = new DecodedMBlock[mblocksInFrame];
-            headers = new SliceHeader[mblocksInFrame];
-        }
-
-        private void decodeSlice(ByteBuffer segment, NALUnit nalUnit) {
-            unescapeNAL(segment);
-            BitReader br = new BitReader(segment);
-            SliceHeader sh = shr.readPart1(br);
-            shr.readPart2(sh, nalUnit, activeSps, activePps, br);
-            MBlockMapper mapper = mapManager.getMapper(sh);
-            Macroblock[] read = dataReader.read(br, sh, mapper);
-            Picture[] refList = sh.refPicReorderingL0 == null ? references : buildRefList(references, nLongTerm,
-                    sh.refPicReorderingL0);
-
-            CodedSlice slice = new CodedSlice(sh, read);
-            DecodedSlice decodeSlice = sliceDecoder.decodeSlice(slice, refList, mapper);
-            mapDecodedMBlocks(decodeSlice, slice, headers, mblocks, mapper);
-        }
-
-        public Picture[] buildRefList(Picture[] buf, int nLongTerm, RefPicReordering refPicReordering) {
-            Picture[] result = new Picture[buf.length];
-
-            int pred = 0, i = 0;
-            for (ReorderOp instr : refPicReordering.getInstructions()) {
-                switch (instr.getType()) {
-                case FORWARD:
-                    result[i++] = buf[pred += instr.getParam()];
-                    break;
-                case BACKWARD:
-                    result[i++] = buf[pred -= instr.getParam()];
-                    break;
-                case LONG_TERM:
-                    result[i++] = buf[buf.length - nLongTerm + instr.getParam()];
-                    break;
-                }
-            }
             return result;
         }
 
@@ -336,61 +275,6 @@ public class H264Decoder implements VideoDecoder {
         return new Picture(width, height, buffer, ColorSpace.YUV420, crop);
     }
 
-    public static void mapDecodedMBlocks(DecodedSlice slice, CodedSlice coded, SliceHeader[] headers,
-            DecodedMBlock[] mblocks, MBlockMapper mBlockMap) {
-
-        DecodedMBlock[] sliceMBlocks = slice.getMblocks();
-        SliceHeader sliceHeader = coded.getHeader();
-
-        int[] addresses = mBlockMap.getAddresses(sliceMBlocks.length);
-
-        for (int i = 0; i < sliceMBlocks.length; i++) {
-            int addr = addresses[i];
-            mblocks[addr] = sliceMBlocks[i];
-            headers[addr] = sliceHeader;
-        }
-    }
-
-    public static FilterParameter[] buildDeblockerParams(int picWidthInMbs, DecodedMBlock[] decoded,
-            SliceHeader[] headers) {
-
-        FilterParameter[] result = new FilterParameter[decoded.length];
-
-        for (int i = 0; i < decoded.length; i++) {
-
-            SliceHeader header = headers[i];
-
-            if (header == null)
-                continue;
-
-            DecodedMBlock leftDec = null;
-            SliceHeader leftHead = null;
-            if ((i % picWidthInMbs) > 0) {
-                leftDec = decoded[i - 1];
-                leftHead = headers[i - 1];
-            }
-
-            DecodedMBlock topDec = null;
-            SliceHeader topHead = null;
-            if (i >= picWidthInMbs) {
-                topDec = decoded[i - picWidthInMbs];
-                topHead = headers[i - picWidthInMbs];
-            }
-
-            result[i] = FilterParameterBuilder.calcParameterForMB(header.disable_deblocking_filter_idc,
-                    header.slice_alpha_c0_offset_div2 << 1, header.slice_beta_offset_div2 << 1, decoded[i], leftDec,
-                    topDec, leftHead == header, topHead == header);
-        }
-
-        return result;
-    }
-
-    @Override
-    public int probe(ByteBuffer data) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
     public void addSps(List<ByteBuffer> spsList) {
         for (ByteBuffer byteBuffer : spsList) {
             ByteBuffer dup = byteBuffer.duplicate();
@@ -407,5 +291,11 @@ public class H264Decoder implements VideoDecoder {
             PictureParameterSet p = PictureParameterSet.read(dup);
             pps.put(p.pic_parameter_set_id, p);
         }
+    }
+
+    @Override
+    public int probe(ByteBuffer data) {
+        // TODO Auto-generated method stub
+        return 0;
     }
 }

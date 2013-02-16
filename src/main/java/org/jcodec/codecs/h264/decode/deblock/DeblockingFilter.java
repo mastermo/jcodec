@@ -1,7 +1,14 @@
 package org.jcodec.codecs.h264.decode.deblock;
 
-import org.jcodec.codecs.h264.decode.deblock.FilterParameter.Threshold;
-import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
+import static java.lang.Math.abs;
+import static org.jcodec.common.tools.MathUtil.clip;
+
+import org.jcodec.codecs.h264.decode.aso.MapManager;
+import org.jcodec.codecs.h264.decode.aso.Mapper;
+import org.jcodec.codecs.h264.io.CAVLC;
+import org.jcodec.codecs.h264.io.model.MBType;
+import org.jcodec.codecs.h264.io.model.SliceHeader;
+import org.jcodec.common.model.Picture;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -12,6 +19,15 @@ import org.jcodec.codecs.h264.decode.model.DecodedMBlock;
  * It's operation is dependant on QP and is designed the way that the strenth is
  * adjusted to the likelyhood of appearence of blocking artifacts on the
  * specific edges.
+ * 
+ * Builds a parameter for deblocking filter based on the properties of specific
+ * macroblocks.
+ * 
+ * A parameter specifies the behavior of deblocking filter on each of 8 edges
+ * that need to filtered for a macroblock.
+ * 
+ * For each edge the following things are evaluated on it's both sides: presence
+ * of DCT coded residual; motion vector difference; spatial location.
  * 
  * 
  * @author Jay Codec
@@ -35,193 +51,298 @@ public class DeblockingFilter {
             new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3,
                     3, 3, 4, 4, 4, 5, 6, 6, 7, 8, 9, 10, 11, 13, 14, 16, 18, 20, 23, 25 } };
 
-    private int maxLuma;
-    private int maxChroma;
-    private int picWidthInMbs;
-    private int picHeightInMbs;
+    private int[][] tokens;
+    private int[][] mvs;
+    private MBType[] mbTypes;
+    private int[][] mbQps;
 
-    public DeblockingFilter(int picWidthInMbs, int picHeightInMbs, int bitDepthLuma, int bitDepthChroma) {
-        this.maxLuma = (1 << bitDepthLuma) - 1;
-        this.maxChroma = (1 << bitDepthChroma) - 1;
-
-        this.picWidthInMbs = picWidthInMbs;
-        this.picHeightInMbs = picHeightInMbs;
+    public DeblockingFilter(int bitDepthLuma, int bitDepthChroma, int[][] tokens, int[][] mvs, MBType[] mbTypes, int[][] mbQps) {
+        this.tokens = tokens;
+        this.mvs = mvs;
+        this.mbTypes = mbTypes;
+        this.mbQps = mbQps;
     }
 
-    public void applyDeblocking(DecodedMBlock[] decoded, FilterParameter[] FilterParameters) {
+    public void deblockSlice(Picture decoded, SliceHeader sh) {
+        Mapper mapper = new MapManager(sh.sps, sh.pps).getMapper(sh);
 
-        for (int mbY = 0; mbY < picHeightInMbs; mbY++) {
-            for (int mbX = 0; mbX < picWidthInMbs; mbX++) {
+        for (int mbIdx = 0;; mbIdx++) {
+            doOneMB(decoded, mbIdx, sh, mbQps, mapper);
+        }
+    }
 
-                int mbAddr = mbY * picWidthInMbs + mbX;
+    private void doOneMB(Picture decoded, int mbIdx, SliceHeader sh, int[][] mbQps, Mapper mapper) {
+        boolean leftAvailable = mapper.leftAvailable(mbIdx);
+        boolean topAvailable = mapper.topAvailable(mbIdx);
+        int mbX = mapper.getMbX(mbIdx);
+        int mbY = mapper.getMbY(mbIdx);
+        int mbWidth = sh.sps.pic_width_in_mbs_minus1 + 1;
 
-                DecodedMBlock leftMb = null;
-                if (mbX > 0) {
-                    leftMb = decoded[mbAddr - 1];
-                }
+        int thisAddr = mbY * mbWidth + mbX;
+        int leftAddr = thisAddr - 1;
+        int topAddr = (mbY - 1) * mbWidth + mbX;
 
-                DecodedMBlock topMb = null;
-                if (mbY > 0) {
-                    topMb = decoded[mbAddr - picWidthInMbs];
-                }
+        boolean thisIntra = (mbTypes[thisAddr] == MBType.I_16x16) || (mbTypes[thisAddr] == MBType.I_NxN);
+        boolean leftIntra = leftAvailable && (mbTypes[leftAddr] == MBType.I_16x16)
+                || (mbTypes[leftAddr] == MBType.I_NxN);
+        boolean topIntra = topAvailable && (mbTypes[topAddr] == MBType.I_16x16) || (mbTypes[topAddr] == MBType.I_NxN);
 
-                DecodedMBlock curMb = decoded[mbAddr];
+        int[] bsV = new int[16];
+        if (leftAvailable) {
+            bsV[0] = calcBoundaryStrenth(3, 0, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+            bsV[4] = calcBoundaryStrenth(7, 4, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+            bsV[8] = calcBoundaryStrenth(11, 8, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+            bsV[12] = calcBoundaryStrenth(15, 12, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        }
 
-                fillVerticalEdge(leftMb, curMb, FilterParameters[mbAddr], mbY, mbX);
-                fillHorizontalEdge(topMb, curMb, FilterParameters[mbAddr], mbY, mbX);
+        bsV[1] = calcBoundaryStrenth(0, 1, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[2] = calcBoundaryStrenth(1, 2, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[3] = calcBoundaryStrenth(2, 3, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        bsV[5] = calcBoundaryStrenth(4, 5, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[6] = calcBoundaryStrenth(5, 6, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[7] = calcBoundaryStrenth(6, 7, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        bsV[9] = calcBoundaryStrenth(8, 9, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[10] = calcBoundaryStrenth(9, 10, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[11] = calcBoundaryStrenth(10, 11, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        bsV[13] = calcBoundaryStrenth(12, 13, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[14] = calcBoundaryStrenth(13, 14, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsV[15] = calcBoundaryStrenth(14, 15, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        int[] bsH = new int[16];
+        if (topAvailable) {
+            bsH[0] = calcBoundaryStrenth(12, 0, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+            bsH[1] = calcBoundaryStrenth(13, 1, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+            bsH[2] = calcBoundaryStrenth(14, 2, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+            bsH[3] = calcBoundaryStrenth(15, 3, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        }
+
+        bsH[4] = calcBoundaryStrenth(0, 4, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[5] = calcBoundaryStrenth(1, 5, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[6] = calcBoundaryStrenth(2, 6, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[7] = calcBoundaryStrenth(3, 7, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        bsH[8] = calcBoundaryStrenth(4, 8, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[9] = calcBoundaryStrenth(5, 9, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[10] = calcBoundaryStrenth(6, 10, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[11] = calcBoundaryStrenth(7, 11, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        bsH[12] = calcBoundaryStrenth(8, 12, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[13] = calcBoundaryStrenth(9, 13, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[14] = calcBoundaryStrenth(10, 14, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+        bsH[15] = calcBoundaryStrenth(11, 15, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
+                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
+
+        doOneComponent(decoded, 0, mbX << 2, mbY << 2, bsV, bsH, sh.slice_alpha_c0_offset_div2 << 1,
+                sh.slice_beta_offset_div2 << 1, sh.disable_deblocking_filter_idc, mbQps[0][thisAddr], leftAvailable,
+                leftAvailable ? mbQps[0][leftAddr] : null, topAvailable, topAvailable ? mbQps[0][topAddr] : null);
+
+        doOneComponent(decoded, 1, mbX << 1, mbY << 1, bsV, bsH, sh.slice_alpha_c0_offset_div2 << 1,
+                sh.slice_beta_offset_div2 << 1, sh.disable_deblocking_filter_idc, mbQps[1][thisAddr], leftAvailable,
+                leftAvailable ? mbQps[1][leftAddr] : null, topAvailable, topAvailable ? mbQps[1][topAddr] : null);
+
+        doOneComponent(decoded, 2, mbX << 1, mbY << 1, bsV, bsH, sh.slice_alpha_c0_offset_div2 << 1,
+                sh.slice_beta_offset_div2 << 1, sh.disable_deblocking_filter_idc, mbQps[2][thisAddr], leftAvailable,
+                leftAvailable ? mbQps[2][leftAddr] : null, topAvailable, topAvailable ? mbQps[2][topAddr] : null);
+    }
+
+    static int[] inverse = new int[] { 0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15 };
+
+    private void doOneComponent(Picture decoded, int comp, int mbX, int mbY, int[] bsV, int bsH[], int alphaC0Offset,
+            int betaOffset, int disableDeblockingFilterIdc, int curQp, boolean leftAvailable, int leftQp,
+            boolean topAvailable, int topQp) {
+
+        int[] alphaV = new int[4];
+        int[] betaV = new int[4];
+        if (leftAvailable) {
+            int avgQpV = (leftQp + curQp + 1) >> 1;
+            alphaV[0] = getIdxAlpha(alphaC0Offset, avgQpV);
+            betaV[0] = getIdxBeta(betaOffset, avgQpV);
+        }
+
+        int[] alphaH = new int[4];
+        int[] betaH = new int[4];
+        if (topAvailable) {
+            int avgQpH = (topQp + curQp + 1) >> 1;
+            alphaH[0] = getIdxAlpha(alphaC0Offset, avgQpH);
+            betaH[0] = getIdxBeta(betaOffset, avgQpH);
+        }
+
+        alphaV[1] = alphaV[2] = alphaV[3] = alphaH[1] = alphaH[2] = alphaH[3] = getIdxAlpha(alphaC0Offset, curQp);
+        betaV[1] = betaV[2] = betaV[3] = betaH[1] = betaH[2] = betaH[3] = getIdxBeta(betaOffset, curQp);
+
+        if (disableDeblockingFilterIdc == 0) {
+            throw new RuntimeException("Unclear, verify");
+            // enabled = true;
+            // filterLeft = leftDec != null;
+            // filterTop = topDec != null;
+        } else if (disableDeblockingFilterIdc == 2) {
+            fillVerticalEdge(decoded, comp, mbY, mbX, alphaV, betaV, bsV, leftAvailable);
+            fillHorizontalEdge(decoded, comp, mbY, mbX, alphaH, betaH, bsH, topAvailable);
+        }
+    }
+
+    private int calcBoundaryStrenth(int blkAAddr, int blkBAddr, boolean atMbBoundary, boolean leftIntra,
+            boolean rightIntra, int leftToken, int rightToken, int[] mvA, int[] mvB) {
+
+        if (atMbBoundary && (leftIntra || rightIntra))
+            return 4;
+        else if (leftIntra || rightIntra)
+            return 3;
+        else {
+
+            if (CAVLC.totalCoeff(leftToken) > 0 || CAVLC.totalCoeff(rightToken) > 0)
+                return 2;
+
+            if (mvA[2] == -1 && mvB[2] >= 0)
+                return 1;
+            else if (mvA[2] >= 0 && mvB[2] == -1)
+                return 1;
+            else if (mvA[2] >= 0 && mvB[2] >= 0) {
+
+                // Picture leftRef = refListA[mvA[2]];
+                // Picture rightRef = refListB[mvB[2]];
+                if (true)
+                    throw new RuntimeException("Check actual refs for reordering");
+
+//                if (leftRef != rightRef)
+//                    return 1;
+
+                if (abs(mvA[0] - mvB[0]) >= 4 || abs(mvA[1] - mvB[1]) >= 4)
+                    return 1;
             }
         }
+
+        return 0;
     }
 
-    private void fillHorizontalEdge(DecodedMBlock topMb, DecodedMBlock curMb, FilterParameter param, int mbY, int mbX) {
+    private static int getIdxBeta(int sliceBetaOffset, int avgQp) {
+        int idxB = avgQp + sliceBetaOffset;
+        idxB = idxB > 51 ? idxB = 51 : (idxB < 0 ? idxB = 0 : idxB);
 
-        if (!param.isEnabled())
-            return;
+        return idxB;
+    }
 
-        DecodedMBlock mbP, mbQ = curMb;
-        int blkY;
-        if (param.isFilterTop()) {
-            blkY = 0;
-            mbP = topMb;
-        } else {
-            blkY = 1;
-            mbP = curMb;
-        }
+    private static int getIdxAlpha(int sliceAlphaC0Offset, int avgQp) {
+        int idxA = avgQp + sliceAlphaC0Offset;
+        idxA = idxA > 51 ? idxA = 51 : (idxA < 0 ? idxA = 0 : idxA);
 
-        for (; blkY < 4; blkY++) {
+        return idxA;
+    }
 
+    private void fillHorizontalEdge(Picture pic, int comp, int x, int y, int[] alpha, int[] beta, int[] bs,
+            boolean filterTop) {
+
+        for (int blkY = filterTop ? 0 : 1; blkY < 4; blkY++) {
             for (int blkX = 0; blkX < 4; blkX++) {
-
-                int bs = param.getBsH()[(blkY << 2) + blkX];
-
-                Threshold lumaThresh = param.getLumaThresh();
-                filterBlockEdgeHoris(mbP.getLuma(), mbQ.getLuma(), blkX, blkY, lumaThresh.getAlphaH()[blkY],
-                        lumaThresh.getBetaH()[blkY], bs, false);
-
-                // Chroma
-                if ((blkY % 2) == 0) {
-
-                    Threshold cbThresh = param.getCbThresh();
-                    filterBlockEdgeHoris(mbP.getChroma().getCb(), mbQ.getChroma().getCb(), blkX, blkY,
-                            cbThresh.getAlphaH()[blkY], param.getCbThresh().getBetaH()[blkY], bs, true);
-
-                    Threshold crThresh = param.getCrThresh();
-                    filterBlockEdgeHoris(mbP.getChroma().getCr(), mbQ.getChroma().getCr(), blkX, blkY,
-                            crThresh.getAlphaH()[blkY], crThresh.getBetaH()[blkY], bs, true);
-                }
+                filterBlockEdgeHoris(pic, comp, x + (blkX << 2), y + (blkY << 2), alpha[blkY], beta[blkY],
+                        bs[(blkY << 2) + blkX]);
             }
-
-            mbP = curMb;
         }
     }
 
-    private void fillVerticalEdge(DecodedMBlock leftMb, DecodedMBlock curMb, FilterParameter param, int mbY, int mbX) {
+    private void fillVerticalEdge(Picture pic, int comp, int x, int y, int[] alpha, int[] beta, int[] bs,
+            boolean filterLeft) {
 
-        if (!param.isEnabled())
-            return;
-
-        DecodedMBlock mbP, mbQ = curMb;
-        int blkX;
-        if (param.isFilterLeft()) {
-            blkX = 0;
-            mbP = leftMb;
-        } else {
-            blkX = 1;
-            mbP = curMb;
-        }
-
-        for (; blkX < 4; blkX++) {
-
+        for (int blkX = filterLeft ? 0 : 1; blkX < 4; blkX++) {
             for (int blkY = 0; blkY < 4; blkY++) {
-
-                int bs = param.getBsV()[(blkY << 2) + blkX];
-
-                Threshold lumaThresh = param.getLumaThresh();
-                filterBlockEdgeVert(mbP.getLuma(), mbQ.getLuma(), blkX, blkY, lumaThresh.getAlphaV()[blkX],
-                        lumaThresh.getBetaV()[blkX], bs, false);
-
-                // Chroma
-                if ((blkX % 2) == 0) {
-
-                    Threshold cbThresh = param.getCbThresh();
-                    filterBlockEdgeVert(mbP.getChroma().getCb(), mbQ.getChroma().getCb(), blkX, blkY,
-                            cbThresh.getAlphaV()[blkX], cbThresh.getBetaV()[blkX], bs, true);
-
-                    Threshold crThresh = param.getCrThresh();
-                    filterBlockEdgeVert(mbP.getChroma().getCr(), mbQ.getChroma().getCr(), blkX, blkY,
-                            crThresh.getAlphaV()[blkX], crThresh.getBetaV()[blkX], bs, true);
-                }
+                filterBlockEdgeVert(pic, comp, x + (blkX << 2), y + (blkY << 2), alpha[blkX], beta[blkX],
+                        bs[(blkY << 2) + blkX]);
             }
-
-            mbP = curMb;
         }
     }
 
-    private void filterBlockEdgeHoris(int[] pelsP, int[] pelsQ, int blkX, int blkY, int indexAlpha, int indexBeta,
-            int bs, boolean isChroma) {
-        int pelsInBlock = isChroma ? 2 : 4;
-        int stride = isChroma ? 8 : 16;
+    private void filterBlockEdgeHoris(Picture pic, int comp, int x, int y, int indexAlpha, int indexBeta, int bs) {
 
-        int pBlkY = ((blkY + 3) % 4) + 1;
-        int offsetQ = (blkY * pelsInBlock) * stride + blkX * pelsInBlock;
-        int offsetP = (pBlkY * pelsInBlock) * stride + blkX * pelsInBlock;
+        int stride = pic.getPlaneWidth(comp);
+        int offset = y * stride + x;
 
-        for (int pixOff = 0; pixOff < pelsInBlock; pixOff++) {
-            int p2Idx = offsetP - 3 * stride + pixOff;
-            int p1Idx = offsetP - 2 * stride + pixOff;
-            int p0Idx = offsetP - stride + pixOff;
-            int q0Idx = offsetQ + pixOff;
-            int q1Idx = offsetQ + stride + pixOff;
-            int q2Idx = offsetQ + 2 * stride + pixOff;
+        for (int pixOff = 0; pixOff < 4; pixOff++) {
+            int p2Idx = offset - 3 * stride + pixOff;
+            int p1Idx = offset - 2 * stride + pixOff;
+            int p0Idx = offset - stride + pixOff;
+            int q0Idx = offset + pixOff;
+            int q1Idx = offset + stride + pixOff;
+            int q2Idx = offset + 2 * stride + pixOff;
 
             if (bs == 4) {
-                int p3Idx = offsetP - 4 * stride + pixOff;
-                int q3Idx = offsetQ + 3 * stride + pixOff;
+                int p3Idx = offset - 4 * stride + pixOff;
+                int q3Idx = offset + 3 * stride + pixOff;
 
-                filterBs4(indexAlpha, indexBeta, pelsP, pelsQ, p3Idx, p2Idx, p1Idx, p0Idx, q0Idx, q1Idx, q2Idx, q3Idx,
-                        isChroma);
+                filterBs4(indexAlpha, indexBeta, pic.getPlaneData(comp), p3Idx, p2Idx, p1Idx, p0Idx, q0Idx, q1Idx,
+                        q2Idx, q3Idx, comp != 0);
             } else if (bs > 0) {
 
-                filterBs(bs, indexAlpha, indexBeta, pelsP, pelsQ, p2Idx, p1Idx, p0Idx, q0Idx, q1Idx, q2Idx, isChroma);
+                filterBs(bs, indexAlpha, indexBeta, pic.getPlaneData(comp), p2Idx, p1Idx, p0Idx, q0Idx, q1Idx, q2Idx,
+                        comp != 0);
             }
         }
     }
 
-    private void filterBlockEdgeVert(int[] pelsP, int[] pelsQ, int blkX, int blkY, int indexAlpha, int indexBeta,
-            int bs, boolean isChroma) {
-        int pBlkX = ((blkX + 3) % 4) + 1;
+    private void filterBlockEdgeVert(Picture pic, int comp, int x, int y, int indexAlpha, int indexBeta, int bs) {
 
-        int pelsInBlock = isChroma ? 2 : 4;
-        int stride = isChroma ? 8 : 16;
-        for (int i = 0; i < pelsInBlock; i++) {
-            int offsetQ = (blkY * pelsInBlock + i) * stride + blkX * pelsInBlock;
-            int offsetP = (blkY * pelsInBlock + i) * stride + pBlkX * pelsInBlock;
-            int p2Idx = offsetP - 3;
-            int p1Idx = offsetP - 2;
-            int p0Idx = offsetP - 1;
+        int stride = pic.getPlaneWidth(comp);
+        for (int i = 0; i < 4; i++) {
+            int offsetQ = (y + i) * stride + x;
+            int p2Idx = offsetQ - 3;
+            int p1Idx = offsetQ - 2;
+            int p0Idx = offsetQ - 1;
             int q0Idx = offsetQ;
             int q1Idx = offsetQ + 1;
             int q2Idx = offsetQ + 2;
+
             if (bs == 4) {
-                int p3Idx = offsetP - 4;
+                int p3Idx = offsetQ - 4;
                 int q3Idx = offsetQ + 3;
-                filterBs4(indexAlpha, indexBeta, pelsP, pelsQ, p3Idx, p2Idx, p1Idx, p0Idx, q0Idx, q1Idx, q2Idx, q3Idx,
-                        isChroma);
+                filterBs4(indexAlpha, indexBeta, pic.getPlaneData(comp), p3Idx, p2Idx, p1Idx, p0Idx, q0Idx, q1Idx,
+                        q2Idx, q3Idx, comp != 0);
             } else if (bs > 0) {
-                filterBs(bs, indexAlpha, indexBeta, pelsP, pelsQ, p2Idx, p1Idx, p0Idx, q0Idx, q1Idx, q2Idx, isChroma);
+                filterBs(bs, indexAlpha, indexBeta, pic.getPlaneData(comp), p2Idx, p1Idx, p0Idx, q0Idx, q1Idx, q2Idx,
+                        comp != 0);
             }
         }
     }
 
-    private void filterBs(int bs, int indexAlpha, int indexBeta, int[] pelsP, int[] pelsQ, int p2Idx, int p1Idx,
-            int p0Idx, int q0Idx, int q1Idx, int q2Idx, boolean isChroma) {
+    private void filterBs(int bs, int indexAlpha, int indexBeta, int[] pels, int p2Idx, int p1Idx, int p0Idx,
+            int q0Idx, int q1Idx, int q2Idx, boolean isChroma) {
 
-        int p1 = pelsP[p1Idx];
-        int p0 = pelsP[p0Idx];
-        int q0 = pelsQ[q0Idx];
-        int q1 = pelsQ[q1Idx];
-
-        int maxPel = isChroma ? maxChroma : maxLuma;
+        int p1 = pels[p1Idx];
+        int p0 = pels[p0Idx];
+        int q0 = pels[q0Idx];
+        int q1 = pels[q1Idx];
 
         int alphaThresh = alphaTab[indexAlpha];
         int betaThresh = betaTab[indexBeta];
@@ -239,8 +360,8 @@ public class DeblockingFilter {
         boolean conditionP, conditionQ;
         int tC;
         if (!isChroma) {
-            int ap = abs(pelsP[p2Idx] - p0);
-            int aq = abs(pelsQ[q2Idx] - q0);
+            int ap = abs(pels[p2Idx] - p0);
+            int aq = abs(pels[q2Idx] - q0);
             tC = tC0 + ((ap < betaThresh) ? 1 : 0) + ((aq < betaThresh) ? 1 : 0);
             conditionP = ap < betaThresh;
             conditionQ = aq < betaThresh;
@@ -259,35 +380,33 @@ public class DeblockingFilter {
         q0n = q0n < 0 ? 0 : q0n;
 
         if (conditionP) {
-            int p2 = pelsP[p2Idx];
+            int p2 = pels[p2Idx];
 
             int diff = (p2 + ((p0 + q0 + 1) >> 1) - (p1 << 1)) >> 1;
             diff = diff < -tC0 ? -tC0 : (diff > tC0 ? tC0 : diff);
             int p1n = p1 + diff;
-            pelsP[p1Idx] = p1n <= maxPel ? p1n : maxPel;
+            pels[p1Idx] = clip(p1n, 0, 255);
         }
 
         if (conditionQ) {
-            int q2 = pelsQ[q2Idx];
+            int q2 = pels[q2Idx];
             int diff = (q2 + ((p0 + q0 + 1) >> 1) - (q1 << 1)) >> 1;
             diff = diff < -tC0 ? -tC0 : (diff > tC0 ? tC0 : diff);
             int q1n = q1 + diff;
-            pelsQ[q1Idx] = q1n <= maxPel ? q1n : maxPel;
+            pels[q1Idx] = clip(q1n, 0, 255);
         }
 
-        pelsQ[q0Idx] = q0n <= maxPel ? q0n : maxPel;
-        pelsP[p0Idx] = p0n <= maxPel ? p0n : maxPel;
+        pels[q0Idx] = clip(q0n, 0, 255);
+        pels[p0Idx] = clip(p0n, 0, 255);
 
     }
 
-    private void filterBs4(int indexAlpha, int indexBeta, int[] pelsP, int[] pelsQ, int p3Idx, int p2Idx, int p1Idx,
-            int p0Idx, int q0Idx, int q1Idx, int q2Idx, int q3Idx, boolean isChroma) {
-        int p0 = pelsP[p0Idx];
-        int q0 = pelsQ[q0Idx];
-        int p1 = pelsP[p1Idx];
-        int q1 = pelsQ[q1Idx];
-
-        int maxPel = isChroma ? maxChroma : maxLuma;
+    private void filterBs4(int indexAlpha, int indexBeta, int[] pels, int p3Idx, int p2Idx, int p1Idx, int p0Idx,
+            int q0Idx, int q1Idx, int q2Idx, int q3Idx, boolean isChroma) {
+        int p0 = pels[p0Idx];
+        int q0 = pels[q0Idx];
+        int p1 = pels[p1Idx];
+        int q1 = pels[q1Idx];
 
         int alphaThresh = alphaTab[indexAlpha];
         int betaThresh = betaTab[indexBeta];
@@ -303,8 +422,8 @@ public class DeblockingFilter {
             conditionP = false;
             conditionQ = false;
         } else {
-            int ap = abs(pelsP[p2Idx] - p0);
-            int aq = abs(pelsQ[q2Idx] - q0);
+            int ap = abs(pels[p2Idx] - p0);
+            int aq = abs(pels[q2Idx] - q0);
 
             conditionP = ap < betaThresh && abs(p0 - q0) < ((alphaThresh >> 2) + 2);
             conditionQ = aq < betaThresh && abs(p0 - q0) < ((alphaThresh >> 2) + 2);
@@ -312,36 +431,32 @@ public class DeblockingFilter {
         }
 
         if (conditionP) {
-            int p3 = pelsP[p3Idx];
-            int p2 = pelsP[p2Idx];
+            int p3 = pels[p3Idx];
+            int p2 = pels[p2Idx];
 
             int p0n = (p2 + 2 * p1 + 2 * p0 + 2 * q0 + q1 + 4) >> 3;
             int p1n = (p2 + p1 + p0 + q0 + 2) >> 2;
             int p2n = (2 * p3 + 3 * p2 + p1 + p0 + q0 + 4) >> 3;
-            pelsP[p0Idx] = p0n <= maxPel ? p0n : maxPel;
-            pelsP[p1Idx] = p1n <= maxPel ? p1n : maxPel;
-            pelsP[p2Idx] = p2n <= maxPel ? p2n : maxPel;
+            pels[p0Idx] = clip(p0n, 0, 255);
+            pels[p1Idx] = clip(p1n, 0, 255);
+            pels[p2Idx] = clip(p2n, 0, 255);
         } else {
             int p0n = (2 * p1 + p0 + q1 + 2) >> 2;
-            pelsP[p0Idx] = p0n <= maxPel ? p0n : maxPel;
+            pels[p0Idx] = clip(p0n, 0, 255);
         }
 
         if (conditionQ && !isChroma) {
-            int q2 = pelsQ[q2Idx];
-            int q3 = pelsQ[q3Idx];
+            int q2 = pels[q2Idx];
+            int q3 = pels[q3Idx];
             int q0n = (p1 + 2 * p0 + 2 * q0 + 2 * q1 + q2 + 4) >> 3;
             int q1n = (p0 + q0 + q1 + q2 + 2) >> 2;
             int q2n = (2 * q3 + 3 * q2 + q1 + q0 + p0 + 4) >> 3;
-            pelsQ[q0Idx] = q0n <= maxPel ? q0n : maxPel;
-            pelsQ[q1Idx] = q1n <= maxPel ? q1n : maxPel;
-            pelsQ[q2Idx] = q2n <= maxPel ? q2n : maxPel;
+            pels[q0Idx] = clip(q0n, 0, 255);
+            pels[q1Idx] = clip(q1n, 0, 255);
+            pels[q2Idx] = clip(q2n, 0, 255);
         } else {
             int q0n = (2 * q1 + q0 + p1 + 2) >> 2;
-            pelsQ[q0Idx] = q0n <= maxPel ? q0n : maxPel;
+            pels[q0Idx] = clip(q0n, 0, 255);
         }
-    }
-
-    static private int abs(int i) {
-        return i > 0 ? i : -i;
     }
 }

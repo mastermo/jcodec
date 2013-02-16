@@ -19,7 +19,7 @@ import org.jcodec.common.io.BitWriter;
  * @author Jay Codec
  * 
  */
-public class SEI extends BitstreamElement {
+public class SEI {
 
     public static class SEIMessage {
         public int payloadType;

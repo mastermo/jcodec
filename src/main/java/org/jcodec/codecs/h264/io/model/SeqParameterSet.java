@@ -1,9 +1,9 @@
 package org.jcodec.codecs.h264.io.model;
 
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readNBit;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readSE;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readBool;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readNBit;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readSE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readUE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeBool;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeNBit;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeSE;
@@ -16,7 +16,7 @@ import static org.jcodec.common.model.ColorSpace.YUV444;
 
 import java.nio.ByteBuffer;
 
-import org.jcodec.codecs.h264.io.read.CAVLCReader;
+import org.jcodec.codecs.h264.decode.CAVLCReader;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.BitWriter;
 import org.jcodec.common.model.ColorSpace;
@@ -32,7 +32,7 @@ import org.jcodec.common.model.ColorSpace;
  * @author Jay Codec
  * 
  */
-public class SeqParameterSet extends BitstreamElement {
+public class SeqParameterSet {
     public int pic_order_cnt_type;
     public boolean field_pic_flag;
     public boolean delta_pic_order_always_zero_flag;

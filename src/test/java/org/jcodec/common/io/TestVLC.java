@@ -3,11 +3,10 @@ package org.jcodec.common.io;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.jcodec.codecs.h264.JAVCTestCase;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class TestVLC extends JAVCTestCase {
+public class TestVLC {
     private String[] codes = new String[] { "101111110001", "1000000", "101111100101", "1000001", "101111110100",
             "1000010", "101111101011", "1000101", "1001000", "1001001", "101111101010", "1011000", "1001100",
             "1001101", "101111100100", "1001110", "101111110101", "1001111", "11", "1010001", "101111100110",

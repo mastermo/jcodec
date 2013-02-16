@@ -112,7 +112,7 @@ public class MapManager {
         }
     }
 
-    public MBlockMapper getMapper(SliceHeader sh) {
+    public Mapper getMapper(SliceHeader sh) {
         updateMap(sh);
         int firstMBInSlice = sh.first_mb_in_slice;
         if (pps.num_slice_groups_minus1 > 0) {
@@ -122,5 +122,4 @@ public class MapManager {
             return new FlatMBlockMapper(sps.pic_width_in_mbs_minus1 + 1, firstMBInSlice);
         }
     }
-
 }

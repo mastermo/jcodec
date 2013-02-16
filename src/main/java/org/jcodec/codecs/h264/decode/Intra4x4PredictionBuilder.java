@@ -1,7 +1,6 @@
 package org.jcodec.codecs.h264.decode;
 
-import org.jcodec.codecs.h264.decode.model.BlockBorder;
-import org.jcodec.codecs.h264.decode.model.PixelBuffer;
+import static org.jcodec.common.tools.MathUtil.clip;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -13,248 +12,295 @@ import org.jcodec.codecs.h264.decode.model.PixelBuffer;
  * 
  */
 public class Intra4x4PredictionBuilder {
-    private int bitDepthLuma;
 
-    public Intra4x4PredictionBuilder(int bitDepthLuma) {
-        this.bitDepthLuma = bitDepthLuma;
-    }
-
-    public void predictWithMode(int mode, BlockBorder border, PixelBuffer pixels) {
+    public static void predictWithMode(int mode, int[] residual, boolean leftAvailable, boolean topAvailable,
+            int[] leftRow, int[] topLine, int mbOffX, int blkX, int blkY) {
 
         switch (mode) {
         case 0:
-            predictVertical(border, pixels);
+            predictVertical(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 1:
-            predictHorizontal(border, pixels);
+            predictHorizontal(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 2:
-            predictDC(border, pixels);
+            predictDC(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 3:
-            predictDiagonalDownLeft(border, pixels);
+            predictDiagonalDownLeft(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 4:
-            predictDiagonalDownRight(border, pixels);
+            predictDiagonalDownRight(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 5:
-            predictVerticalRight(border, pixels);
+            predictVerticalRight(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 6:
-            predictHorizontalDown(border, pixels);
+            predictHorizontalDown(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 7:
-            predictVerticalLeft(border, pixels);
+            predictVerticalLeft(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         case 8:
-            predictHorizontalUp(border, pixels);
+            predictHorizontalUp(residual, leftAvailable, topAvailable, leftRow, topLine, mbOffX, blkX, blkY);
             break;
         }
+        int off1 = (blkY << 4) + blkX + 3;
+        leftRow[blkY] = residual[off1];
+        leftRow[blkY + 1] = residual[off1 + 16];
+        leftRow[blkY + 2] = residual[off1 + 32];
+        leftRow[blkY + 3] = residual[off1 + 48];
+
+        int off2 = (blkY << 4) + blkX + 48;
+        topLine[mbOffX + blkX] = residual[off2];
+        topLine[mbOffX + blkX] = residual[off2 + 1];
+        topLine[mbOffX + blkX] = residual[off2 + 2];
+        topLine[mbOffX + blkX] = residual[off2 + 3];
     }
 
-    public void predictVertical(BlockBorder border, PixelBuffer pixels) {
+    public static void predictVertical(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine, int mbOffX, int blkX, int blkY) {
 
-        for (int y = 0; y < 4; y++) {
-            for (int x = 0; x < 4; x++) {
-                pixels.put(x, y, border.getTop()[x]);
-            }
+        int off = (blkY << 4) + blkX;
+        int toff = mbOffX + blkX;
+        for (int j = 0; j < 4; j++) {
+            residual[off] = clip(residual[off] + topLine[toff], 0, 255);
+            residual[off + 1] = clip(residual[off + 1] + topLine[toff + 1], 0, 255);
+            residual[off + 2] = clip(residual[off + 2] + topLine[toff + 2], 0, 255);
+            residual[off + 3] = clip(residual[off + 3] + topLine[toff + 3], 0, 255);
+            off += 16;
         }
     }
 
-    public void predictHorizontal(BlockBorder border, PixelBuffer pixels) {
+    public static void predictHorizontal(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine, int mbOffX, int blkX, int blkY) {
 
-        for (int y = 0; y < 4; y++) {
-            for (int x = 0; x < 4; x++) {
-                pixels.put(x, y, border.getLeft()[y]);
-            }
+        int off = (blkY << 4) + blkX;
+        for (int j = 0; j < 4; j++) {
+            int l = leftRow[blkY + j];
+            residual[off] = clip(residual[off] + l, 0, 255);
+            residual[off + 1] = clip(residual[off + 1] + l, 0, 255);
+            residual[off + 2] = clip(residual[off + 2] + l, 0, 255);
+            residual[off + 3] = clip(residual[off + 3] + l, 0, 255);
+            off += 16;
         }
     }
 
-    public void predictDC(BlockBorder border, PixelBuffer pixels) {
-        boolean leftAvail = border.getLeft()[0] != -1 && border.getLeft()[1] != -1 && border.getLeft()[2] != -1
-                && border.getLeft()[3] != -1;
-        boolean topAvail = border.getTop()[0] != -1 && border.getTop()[1] != -1 && border.getTop()[2] != -1
-                && border.getTop()[3] != -1;
+    public static void predictDC(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine, int mbOffX, int blkX, int blkY) {
 
         int val;
-        if (leftAvail && topAvail) {
-            val = (border.getLeft()[0] + border.getLeft()[1] + border.getLeft()[2] + border.getLeft()[3]
-                    + border.getTop()[0] + border.getTop()[1] + border.getTop()[2] + border.getTop()[3] + 4) >> 3;
-        } else if (leftAvail) {
-            val = (border.getLeft()[0] + border.getLeft()[1] + border.getLeft()[2] + border.getLeft()[3] + 2) >> 2;
-        } else if (topAvail) {
-            val = (border.getTop()[0] + border.getTop()[1] + border.getTop()[2] + border.getTop()[3] + 2) >> 2;
+        if (leftAvailable && topAvailable) {
+            val = (leftRow[blkY] + leftRow[blkY + 1] + leftRow[blkY + 2] + leftRow[blkY + 3] + topLine[mbOffX + blkX]
+                    + topLine[mbOffX + blkX + 1] + topLine[mbOffX + blkX + 2] + topLine[mbOffX + blkX + 3] + 4) >> 3;
+        } else if (leftAvailable) {
+            val = (leftRow[blkY] + leftRow[blkY + 1] + leftRow[blkY + 2] + leftRow[blkY + 3] + 2) >> 2;
+        } else if (topAvailable) {
+            val = (topLine[mbOffX + blkX] + topLine[mbOffX + blkX + 1] + topLine[mbOffX + blkX + 2]
+                    + topLine[mbOffX + blkX + 3] + 2) >> 2;
         } else {
-            val = 1 << (bitDepthLuma - 1);
+            val = 128;
         }
 
-        for (int y = 0; y < 4; y++) {
-            for (int x = 0; x < 4; x++) {
-                pixels.put(x, y, val);
-            }
-        }
-
-    }
-
-    public void predictDiagonalDownLeft(BlockBorder border, PixelBuffer pixels) {
-
-        for (int y = 0; y < 4; y++) {
-            for (int x = 0; x < 4; x++) {
-
-                if (x == 3 && y == 3)
-                    pixels.put(x, y, (border.getTop()[6] + 3 * border.getTop()[7] + 2) >> 2);
-                else
-                    pixels.put(x, y, (border.getTop()[x + y] + 2 * border.getTop()[x + y + 1]
-                            + border.getTop()[x + y + 2] + 2) >> 2);
-            }
+        int off = (blkY << 4) + blkX;
+        for (int j = 0; j < 4; j++) {
+            residual[off] = clip(residual[off] + val, 0, 255);
+            residual[off + 1] = clip(residual[off + 1] + val, 0, 255);
+            residual[off + 2] = clip(residual[off + 2] + val, 0, 255);
+            residual[off + 3] = clip(residual[off + 3] + val, 0, 255);
+            off += 16;
         }
     }
 
-    public void predictDiagonalDownRight(BlockBorder border, PixelBuffer pixels) {
+    public static void predictDiagonalDownLeft(int[] residual, boolean leftAvailable, boolean topAvailable,
+            int[] leftRow, int[] topLine, int mbOffX, int blkX, int blkY) {
 
+        int off = (blkY << 4) + blkX;
+        for (int y = 0; y < 4; y++) {
+            residual[off] = clip(residual[off] + ddlPix(topLine, mbOffX, blkX, y, 0), 0, 255);
+            residual[off + 1] = clip(residual[off + 1] + ddlPix(topLine, mbOffX, blkX, y, 1), 0, 255);
+            residual[off + 2] = clip(residual[off + 2] + ddlPix(topLine, mbOffX, blkX, y, 2), 0, 255);
+            residual[off + 3] = clip(residual[off + 3] + ddlPix(topLine, mbOffX, blkX, y, 3), 0, 255);
+            off += 16;
+        }
+        residual[off - 16 + 3] = clip(residual[off - 16 + 3]
+                + (topLine[mbOffX + blkX + 6] + 3 * topLine[mbOffX + blkX + 7] + 2) >> 2, 0, 255);
+    }
+
+    private static int ddlPix(int[] topLine, int mbOffX, int blkX, int y, int x) {
+        return (topLine[mbOffX + blkX + x + y] + 2 * topLine[mbOffX + blkX + x + y + 1]
+                + topLine[mbOffX + blkX + x + y + 2] + 2) >> 2;
+    }
+
+    public static void predictDiagonalDownRight(int[] residual, boolean leftAvailable, boolean topAvailable,
+            int[] leftRow, int[] topLine, int mbOffX, int blkX, int blkY) {
+
+        int topLeft = blkY == 0 ? topLine[mbOffX + blkX - 1] : leftRow[blkY - 1];
+
+        int off = (blkY << 4) + blkX;
         for (int y = 0; y < 4; y++) {
             for (int x = 0; x < 4; x++) {
                 if (x > y) {
                     int t1;
                     if (x - y - 2 == -1)
-                        t1 = border.getTopLeft();
+                        t1 = topLeft;
                     else
-                        t1 = border.getTop()[x - y - 2];
+                        t1 = topLine[mbOffX + blkX + x - y - 2];
 
                     int t2;
                     if (x - y - 1 == -1)
-                        t2 = border.getTopLeft();
+                        t2 = topLeft;
                     else
-                        t2 = border.getTop()[x - y - 1];
+                        t2 = topLine[mbOffX + blkX + x - y - 1];
 
                     int t3;
                     if (x - y == -1)
-                        t3 = border.getTopLeft();
+                        t3 = topLeft;
                     else
-                        t3 = border.getTop()[x - y];
+                        t3 = topLine[mbOffX + blkX + x - y];
 
-                    pixels.put(x, y, (t1 + 2 * t2 + t3 + 2) >> 2);
+                    residual[off + x] = clip(residual[off + x] + (t1 + 2 * t2 + t3 + 2) >> 2, 0, 255);
                 } else if (x < y) {
                     int l1;
                     if (y - x - 2 == -1)
-                        l1 = border.getTopLeft();
+                        l1 = topLeft;
                     else
-                        l1 = border.getLeft()[y - x - 2];
+                        l1 = leftRow[blkY + y - x - 2];
 
                     int l2;
                     if (y - x - 1 == -1)
-                        l2 = border.getTopLeft();
+                        l2 = topLeft;
                     else
-                        l2 = border.getLeft()[y - x - 1];
+                        l2 = leftRow[blkY + y - x - 1];
 
                     int l3;
                     if (y - x == -1)
-                        l3 = border.getTopLeft();
+                        l3 = topLeft;
                     else
-                        l3 = border.getLeft()[y - x];
+                        l3 = leftRow[blkY + y - x];
 
-                    pixels.put(x, y, (l1 + 2 * l2 + l3 + 2) >> 2);
+                    residual[off + x] = clip(residual[off + x] + (l1 + 2 * l2 + l3 + 2) >> 2, 0, 255);
                 } else
-                    pixels.put(x, y, (border.getTop()[0] + 2 * border.getTopLeft() + border.getLeft()[0] + 2) >> 2);
+                    residual[off + x] = clip(residual[off + x]
+                            + (topLine[mbOffX + blkX + 0] + 2 * topLeft + leftRow[blkY + 0] + 2) >> 2, 0, 255);
             }
+            off += 16;
         }
     }
 
-    public void predictVerticalRight(BlockBorder border, PixelBuffer pixels) {
+    public static void predictVerticalRight(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine, int mbOffX, int blkX, int blkY) {
 
-        int v1 = (border.getTopLeft() + border.getTop()[0] + 1) >> 1;
-        int v2 = (border.getTop()[0] + border.getTop()[1] + 1) >> 1;
-        int v3 = (border.getTop()[1] + border.getTop()[2] + 1) >> 1;
-        int v4 = (border.getTop()[2] + border.getTop()[3] + 1) >> 1;
-        int v5 = (border.getLeft()[0] + 2 * border.getTopLeft() + border.getTop()[0] + 2) >> 2;
-        int v6 = (border.getTopLeft() + 2 * border.getTop()[0] + border.getTop()[1] + 2) >> 2;
-        int v7 = (border.getTop()[0] + 2 * border.getTop()[1] + border.getTop()[2] + 2) >> 2;
-        int v8 = (border.getTop()[1] + 2 * border.getTop()[2] + border.getTop()[3] + 2) >> 2;
-        int v9 = (border.getTopLeft() + 2 * border.getLeft()[0] + border.getLeft()[1] + 2) >> 2;
-        int v10 = (border.getLeft()[0] + 2 * border.getLeft()[1] + border.getLeft()[2] + 2) >> 2;
+        int topLeft = blkY == 0 ? topLine[mbOffX + blkX - 1] : leftRow[blkY - 1];
 
-        pixels.put(0, 0, v1);
-        pixels.put(1, 0, v2);
-        pixels.put(2, 0, v3);
-        pixels.put(3, 0, v4);
-        pixels.put(0, 1, v5);
-        pixels.put(1, 1, v6);
-        pixels.put(2, 1, v7);
-        pixels.put(3, 1, v8);
-        pixels.put(0, 2, v9);
-        pixels.put(1, 2, v1);
-        pixels.put(2, 2, v2);
-        pixels.put(3, 2, v3);
-        pixels.put(0, 3, v10);
-        pixels.put(1, 3, v5);
-        pixels.put(2, 3, v6);
-        pixels.put(3, 3, v7);
+        int v1 = (topLeft + topLine[mbOffX + blkX + 0] + 1) >> 1;
+        int v2 = (topLine[mbOffX + blkX + 0] + topLine[mbOffX + blkX + 1] + 1) >> 1;
+        int v3 = (topLine[mbOffX + blkX + 1] + topLine[mbOffX + blkX + 2] + 1) >> 1;
+        int v4 = (topLine[mbOffX + blkX + 2] + topLine[mbOffX + blkX + 3] + 1) >> 1;
+        int v5 = (leftRow[blkY + 0] + 2 * topLeft + topLine[mbOffX + blkX + 0] + 2) >> 2;
+        int v6 = (topLeft + 2 * topLine[mbOffX + blkX + 0] + topLine[mbOffX + blkX + 1] + 2) >> 2;
+        int v7 = (topLine[mbOffX + blkX + 0] + 2 * topLine[mbOffX + blkX + 1] + topLine[mbOffX + blkX + 2] + 2) >> 2;
+        int v8 = (topLine[mbOffX + blkX + 1] + 2 * topLine[mbOffX + blkX + 2] + topLine[mbOffX + blkX + 3] + 2) >> 2;
+        int v9 = (topLeft + 2 * leftRow[blkY + 0] + leftRow[blkY + 1] + 2) >> 2;
+        int v10 = (leftRow[blkY + 0] + 2 * leftRow[blkY + 1] + leftRow[blkY + 2] + 2) >> 2;
+
+        int off = (blkY << 4) + blkX;
+        residual[off] = clip(residual[off] + v1, 0, 255);
+        residual[off + 1] = clip(residual[off + 1] + v2, 0, 255);
+        residual[off + 2] = clip(residual[off + 2] + v3, 0, 255);
+        residual[off + 3] = clip(residual[off + 3] + v4, 0, 255);
+        residual[off + 16] = clip(residual[off + 16] + v5, 0, 255);
+        residual[off + 17] = clip(residual[off + 17] + v6, 0, 255);
+        residual[off + 18] = clip(residual[off + 18] + v7, 0, 255);
+        residual[off + 19] = clip(residual[off + 19] + v8, 0, 255);
+        residual[off + 32] = clip(residual[off + 32] + v9, 0, 255);
+        residual[off + 33] = clip(residual[off + 33] + v1, 0, 255);
+        residual[off + 34] = clip(residual[off + 34] + v2, 0, 255);
+        residual[off + 35] = clip(residual[off + 35] + v3, 0, 255);
+        residual[off + 48] = clip(residual[off + 48] + v10, 0, 255);
+        residual[off + 49] = clip(residual[off + 49] + v5, 0, 255);
+        residual[off + 50] = clip(residual[off + 50] + v6, 0, 255);
+        residual[off + 51] = clip(residual[off + 51] + v7, 0, 255);
     }
 
-    public void predictHorizontalDown(BlockBorder border, PixelBuffer pixels) {
+    public static void predictHorizontalDown(int[] residual, boolean leftAvailable, boolean topAvailable,
+            int[] leftRow, int[] topLine, int mbOffX, int blkX, int blkY) {
 
-        int v1 = (border.getTopLeft() + border.getLeft()[0] + 1) >> 1;
-        int v2 = (border.getLeft()[0] + 2 * border.getTopLeft() + border.getTop()[0] + 2) >> 2;
+        int topLeft = blkY == 0 ? topLine[mbOffX + blkX - 1] : leftRow[blkY - 1];
 
-        int v3 = (border.getTopLeft() + 2 * border.getTop()[0] + border.getTop()[1] + 2) >> 2;
-        int v4 = (border.getTop()[0] + 2 * border.getTop()[1] + border.getTop()[2] + 2) >> 2;
-        int v5 = (border.getLeft()[0] + border.getLeft()[1] + 1) >> 1;
-        int v6 = (border.getTopLeft() + 2 * border.getLeft()[0] + border.getLeft()[1] + 2) >> 2;
-        int v7 = (border.getLeft()[1] + border.getLeft()[2] + 1) >> 1;
-        int v8 = (border.getLeft()[0] + 2 * border.getLeft()[1] + border.getLeft()[2] + 2) >> 2;
-        int v9 = (border.getLeft()[2] + border.getLeft()[3] + 1) >> 1;
-        int v10 = (border.getLeft()[1] + 2 * border.getLeft()[2] + border.getLeft()[3] + 2) >> 2;
+        int v1 = (topLeft + leftRow[blkY + 0] + 1) >> 1;
+        int v2 = (leftRow[blkY + 0] + 2 * topLeft + topLine[mbOffX + blkX + 0] + 2) >> 2;
+        int v3 = (topLeft + 2 * topLine[mbOffX + blkX + 0] + topLine[mbOffX + blkX + 1] + 2) >> 2;
+        int v4 = (topLine[mbOffX + blkX + 0] + 2 * topLine[mbOffX + blkX + 1] + topLine[mbOffX + blkX + 2] + 2) >> 2;
+        int v5 = (leftRow[blkY + 0] + leftRow[blkY + 1] + 1) >> 1;
+        int v6 = (topLeft + 2 * leftRow[blkY + 0] + leftRow[blkY + 1] + 2) >> 2;
+        int v7 = (leftRow[blkY + 1] + leftRow[blkY + 2] + 1) >> 1;
+        int v8 = (leftRow[blkY + 0] + 2 * leftRow[blkY + 1] + leftRow[blkY + 2] + 2) >> 2;
+        int v9 = (leftRow[blkY + 2] + leftRow[blkY + 3] + 1) >> 1;
+        int v10 = (leftRow[blkY + 1] + 2 * leftRow[blkY + 2] + leftRow[blkY + 3] + 2) >> 2;
 
-        pixels.put(0, 0, v1);
-        pixels.put(1, 0, v2);
-        pixels.put(2, 0, v3);
-        pixels.put(3, 0, v4);
-        pixels.put(0, 1, v5);
-        pixels.put(1, 1, v6);
-        pixels.put(2, 1, v1);
-        pixels.put(3, 1, v2);
-        pixels.put(0, 2, v7);
-        pixels.put(1, 2, v8);
-        pixels.put(2, 2, v5);
-        pixels.put(3, 2, v6);
-        pixels.put(0, 3, v9);
-        pixels.put(1, 3, v10);
-        pixels.put(2, 3, v7);
-        pixels.put(3, 3, v8);
+        int off = (blkY << 4) + blkX;
+        residual[off] = clip(residual[off] + v1, 0, 255);
+        residual[off + 1] = clip(residual[off + 1] + v2, 0, 255);
+        residual[off + 2] = clip(residual[off + 2] + v3, 0, 255);
+        residual[off + 3] = clip(residual[off + 3] + v4, 0, 255);
+        residual[off + 16] = clip(residual[off + 16] + v5, 0, 255);
+        residual[off + 17] = clip(residual[off + 17] + v6, 0, 255);
+        residual[off + 18] = clip(residual[off + 18] + v1, 0, 255);
+        residual[off + 19] = clip(residual[off + 19] + v2, 0, 255);
+        residual[off + 32] = clip(residual[off + 32] + v7, 0, 255);
+        residual[off + 33] = clip(residual[off + 33] + v8, 0, 255);
+        residual[off + 34] = clip(residual[off + 34] + v5, 0, 255);
+        residual[off + 35] = clip(residual[off + 35] + v6, 0, 255);
+        residual[off + 48] = clip(residual[off + 48] + v9, 0, 255);
+        residual[off + 49] = clip(residual[off + 49] + v10, 0, 255);
+        residual[off + 50] = clip(residual[off + 50] + v7, 0, 255);
+        residual[off + 51] = clip(residual[off + 51] + v8, 0, 255);
     }
 
-    public void predictVerticalLeft(BlockBorder border, PixelBuffer pixels) {
+    public static void predictVerticalLeft(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine, int mbOffX, int blkX, int blkY) {
 
+        int off = (blkY << 4) + blkX;
         for (int y = 0; y < 4; y++) {
             for (int x = 0; x < 4; x++) {
-                if (y % 2 == 0)
-                    pixels.put(x, y, (border.getTop()[x + (y >> 1)] + border.getTop()[x + (y >> 1) + 1] + 1) >> 1);
+                if ((y & 1) == 0)
+                    residual[off++] = clip(
+                            residual[off]
+                                    + (topLine[mbOffX + blkX + x + (y >> 1)]
+                                            + topLine[mbOffX + blkX + x + (y >> 1) + 1] + 1) >> 1, 0, 255);
                 else
-                    pixels.put(x, y,
-                            (border.getTop()[x + (y >> 1)] + 2 * border.getTop()[x + (y >> 1) + 1]
-                                    + border.getTop()[x + (y >> 1) + 2] + 2) >> 2);
+                    residual[off++] = clip(residual[off]
+                            + (topLine[mbOffX + blkX + x + (y >> 1)] + 2 * topLine[mbOffX + blkX + x + (y >> 1) + 1]
+                                    + topLine[mbOffX + blkX + x + (y >> 1) + 2] + 2) >> 2, 0, 255);
             }
+            off += 12;
         }
     }
 
-    public void predictHorizontalUp(BlockBorder border, PixelBuffer pixels) {
+    public static void predictHorizontalUp(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine, int mbOffX, int blkX, int blkY) {
 
+        int off = (blkY << 4) + blkX;
         for (int y = 0; y < 4; y++) {
             for (int x = 0; x < 4; x++) {
                 int zHU = x + 2 * y;
 
                 if (zHU < 5) {
                     if (zHU % 2 == 0)
-                        pixels.put(x, y, (border.getLeft()[y + (x >> 1)] + border.getLeft()[y + (x >> 1) + 1] + 1) >> 1);
+                        residual[off++] = clip(residual[off]
+                                + (leftRow[blkY + y + (x >> 1)] + leftRow[blkY + y + (x >> 1) + 1] + 1) >> 1, 0, 255);
                     else
-                        pixels.put(x, y, (border.getLeft()[y + (x >> 1)] + 2 * border.getLeft()[y + (x >> 1) + 1]
-                                + border.getLeft()[y + (x >> 1) + 2] + 2) >> 2);
+                        residual[off++] = clip(residual[off]
+                                + (leftRow[blkY + y + (x >> 1)] + 2 * leftRow[blkY + y + (x >> 1) + 1]
+                                        + leftRow[blkY + y + (x >> 1) + 2] + 2) >> 2, 0, 255);
                 } else if (zHU == 5)
-                    pixels.put(x, y, (border.getLeft()[2] + 3 * border.getLeft()[3] + 2) >> 2);
+                    residual[off++] = clip(residual[off] + (leftRow[blkY + 2] + 3 * leftRow[blkY + 3] + 2) >> 2, 0, 255);
                 else
-                    pixels.put(x, y, border.getLeft()[3]);
+                    residual[off++] = clip(residual[off] + leftRow[blkY + 3], 0, 255);
 
             }
+            off += 12;
         }
     }
 }

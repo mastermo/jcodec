@@ -1,12 +1,14 @@
 package org.jcodec.codecs.h264.io;
 
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readZeroBitCount;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readU;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readZeroBitCount;
 import static org.jcodec.common.model.ColorSpace.YUV420;
 import static org.jcodec.common.model.ColorSpace.YUV422;
 import static org.jcodec.common.model.ColorSpace.YUV444;
 
 import org.jcodec.codecs.h264.H264Const;
+import org.jcodec.codecs.h264.io.model.PictureParameterSet;
+import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.io.BitWriter;
 import org.jcodec.common.io.VLC;
@@ -27,13 +29,48 @@ public class CAVLC {
     private ColorSpace color;
     private VLC chromaDCVLC;
 
-    public CAVLC(ColorSpace color) {
-        this.color = color;
+    private int[] tokensLeft;
+    private int[] tokensTop;
+    private int mbWidth;
+    private int mbMask;
+
+    public CAVLC(SeqParameterSet sps, PictureParameterSet pps, int mbW, int mbH) {
+        this.color = sps.chroma_format_idc;
         this.chromaDCVLC = codeTableChromaDC();
+        this.mbWidth = sps.pic_width_in_mbs_minus1 + 1;
+
+        this.mbMask = (1 << mbH) - 1;
+
+        tokensLeft = new int[4];
+        tokensTop = new int[mbWidth << mbW];
     }
 
-    public int writeBlock(BitWriter out, int[] coeff, VLC coeffTokenTab, VLC[] totalZerosTab, int firstCoeff,
+    public void writeACBlock(BitWriter out, int blkIndX, int blkIndY, int[] coeff, VLC[] totalZerosTab, int firstCoeff,
             int maxCoeff, int[] scan) {
+        VLC coeffTokenTab = getCoeffTokenVLCForLuma(blkIndX != 0, tokensLeft[blkIndY & mbMask], blkIndY != 0,
+                tokensTop[blkIndX]);
+
+        int coeffToken = writeBlockGen(out, coeff, totalZerosTab, firstCoeff, maxCoeff, scan, coeffTokenTab);
+
+        tokensLeft[blkIndY & mbMask] = coeffToken;
+        tokensTop[blkIndX] = coeffToken;
+    }
+
+    public void writeChrDCBlock(BitWriter out, int[] coeff, VLC[] totalZerosTab, int firstCoeff, int maxCoeff,
+            int[] scan) {
+        writeBlockGen(out, coeff, totalZerosTab, firstCoeff, maxCoeff, scan, getCoeffTokenVLCForChromaDC());
+    }
+
+    public void writeLumaDCBlock(BitWriter out, int blkIndX, int blkIndY, int[] coeff, VLC[] totalZerosTab,
+            int firstCoeff, int maxCoeff, int[] scan) {
+        VLC coeffTokenTab = getCoeffTokenVLCForLuma(blkIndX != 0, tokensLeft[blkIndY & mbMask], blkIndY != 0,
+                tokensTop[blkIndX]);
+
+        writeBlockGen(out, coeff, totalZerosTab, firstCoeff, maxCoeff, scan, coeffTokenTab);
+    }
+
+    private int writeBlockGen(BitWriter out, int[] coeff, VLC[] totalZerosTab, int firstCoeff, int maxCoeff,
+            int[] scan, VLC coeffTokenTab) {
         int trailingOnes = 0, totalCoeff = 0, totalZeros = 0;
         int[] runBefore = new int[maxCoeff];
         int[] levels = new int[maxCoeff];
@@ -66,7 +103,6 @@ public class CAVLC {
                 writeRuns(out, runBefore, totalCoeff, totalZeros);
             }
         }
-
         return coeffToken;
     }
 
@@ -157,7 +193,8 @@ public class CAVLC {
         return null;
     }
 
-    public int readCoeffs(BitReader in, VLC coeffTokenTab, VLC[] totalZerosTab, int[] coeffLevel) {
+    public int readCoeffs(BitReader in, VLC coeffTokenTab, VLC[] totalZerosTab, int[] coeffLevel, int firstCoeff,
+            int nCoeff, int[] zigzag4x4) {
         int coeffToken = coeffTokenTab.readVLC(in);
         int totalCoeff = totalCoeff(coeffToken);
         int trailingOnes = trailingOnes(coeffToken);
@@ -256,5 +293,31 @@ public class CAVLC {
 
     public static final int trailingOnes(int coeffToken) {
         return coeffToken & 0xf;
+    }
+
+    public static int[] NO_ZIGZAG = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+
+    public void readChromaDCBlock(BitReader reader, int[] coeff, boolean leftAvailable, boolean topAvailable) {
+        VLC coeffTokenTab = getCoeffTokenVLCForChromaDC();
+
+        readCoeffs(reader, coeffTokenTab, coeff.length == 16 ? H264Const.totalZeros16
+                : (coeff.length == 8 ? H264Const.totalZeros8 : H264Const.totalZeros4), coeff, 0, coeff.length,
+                NO_ZIGZAG);
+    }
+
+    public void readLumaDCBlock(BitReader reader, int[] coeff, boolean leftAvailable, boolean topAvailable,
+            int[] zigzag4x4) {
+        VLC coeffTokenTab = getCoeffTokenVLCForLuma(leftAvailable, tokensLeft[0], topAvailable, tokensTop[0]);
+
+        readCoeffs(reader, coeffTokenTab, H264Const.totalZeros16, coeff, 0, 16, zigzag4x4);
+    }
+
+    public void readACBlock(BitReader reader, int[] coeff, int blkIndX, int blkIndY, boolean leftAvailable,
+            boolean topAvailable, int firstCoeff, int nCoeff, int[] zigzag4x4) {
+        VLC coeffTokenTab = getCoeffTokenVLCForLuma((blkIndX & mbMask) > 0 || leftAvailable, tokensLeft[blkIndY
+                & mbMask], (blkIndY & mbMask) > 0 || topAvailable, tokensTop[blkIndX]);
+
+        int readCoeffs = readCoeffs(reader, coeffTokenTab, H264Const.totalZeros16, coeff, firstCoeff, nCoeff, zigzag4x4);
+        tokensLeft[blkIndY & mbMask] = tokensTop[blkIndX] = readCoeffs;
     }
 }

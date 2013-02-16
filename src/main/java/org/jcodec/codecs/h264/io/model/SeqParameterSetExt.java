@@ -1,8 +1,8 @@
 package org.jcodec.codecs.h264.io.model;
 
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readBool;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readU;
-import static org.jcodec.codecs.h264.io.read.CAVLCReader.readUE;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readBool;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readU;
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readUE;
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeTrailingBits;
 
 import java.nio.ByteBuffer;
@@ -21,7 +21,7 @@ import org.jcodec.common.io.BitWriter;
  * @author Jay Codec
  * 
  */
-public class SeqParameterSetExt extends BitstreamElement {
+public class SeqParameterSetExt {
 
     public int seq_parameter_set_id;
     public int aux_format_idc;

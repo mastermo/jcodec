@@ -1,5 +1,7 @@
 package org.jcodec.codecs.h264.decode;
 
+import org.jcodec.common.ArrayUtil;
+
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
@@ -45,11 +47,11 @@ public class CoeffTransformer {
      * @param block
      * @return
      */
-    public final void idct4x4(int[] block) {
+    public final static void idct4x4(int[] block) {
         idct4x4(block, block);
     }
 
-    public final void idct4x4(int[] block, int[] out) {
+    public static final void idct4x4(int[] block, int[] out) {
         // Horisontal
         for (int i = 0; i < 16; i += 4) {
             int e0 = block[i] + block[i + 2];
@@ -114,7 +116,7 @@ public class CoeffTransformer {
      * 
      * @param scaled
      */
-    public void invDC4x4(int[] scaled) {
+    public static void invDC4x4(int[] scaled) {
         // Horisontal
         for (int i = 0; i < 16; i += 4) {
             int e0 = scaled[i] + scaled[i + 2];
@@ -174,7 +176,7 @@ public class CoeffTransformer {
         }
     }
 
-    public void dequantizeAC(int[] coeffs, int qp) {
+    public static void dequantizeAC(int[] coeffs, int qp) {
         int group = qp % 6;
 
         if (qp >= 24) {
@@ -227,7 +229,7 @@ public class CoeffTransformer {
         return result;
     }
 
-    public void dequantizeDC4x4(int[] coeffs, int qp) {
+    public static void dequantizeDC4x4(int[] coeffs, int qp) {
         int group = qp % 6;
 
         if (qp >= 36) {
@@ -269,7 +271,7 @@ public class CoeffTransformer {
      * 
      * @param block
      */
-    public void invDC2x2(int[] block) {
+    public static void invDC2x2(int[] block) {
         int t0, t1, t2, t3;
 
         t0 = block[0] + block[1];
@@ -292,7 +294,7 @@ public class CoeffTransformer {
         invDC2x2(block);
     }
 
-    public void dequantizeDC2x2(int[] transformed, int qp) {
+    public static void dequantizeDC2x2(int[] transformed, int qp) {
 
         int group = qp % 6;
         int shift = qp / 6;
@@ -322,6 +324,13 @@ public class CoeffTransformer {
                 coeffs[i] = (((((coeffs[i] ^ sign) - sign) * quantCoeff[offset][0] + addition) >> qbits) ^ sign) - sign;
             }
         }
+    }
+    
+    public static void reorderDC4x4(int[] dc) {
+        ArrayUtil.swap(dc, 2, 4);
+        ArrayUtil.swap(dc, 3, 5);
+        ArrayUtil.swap(dc, 10, 12);
+        ArrayUtil.swap(dc, 11, 13);
     }
 
     public void fvdDC4x2(int[] dc) {

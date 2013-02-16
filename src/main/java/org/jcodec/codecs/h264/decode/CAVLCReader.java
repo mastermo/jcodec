@@ -1,4 +1,4 @@
-package org.jcodec.codecs.h264.io.read;
+package org.jcodec.codecs.h264.decode;
 
 import static org.jcodec.common.tools.Debug.trace;
 
