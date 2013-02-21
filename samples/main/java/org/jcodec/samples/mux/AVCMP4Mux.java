@@ -5,10 +5,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.jcodec.codecs.h264.annexb.MappedH264ES;
-import org.jcodec.codecs.h264.io.model.NALUnit;
-import org.jcodec.codecs.h264.io.model.NALUnitType;
+import org.jcodec.codecs.h264.MappedH264ES;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
@@ -20,6 +20,7 @@ import org.jcodec.containers.mp4.MP4Muxer.CompressedTrack;
 import org.jcodec.containers.mp4.MP4Packet;
 import org.jcodec.containers.mp4.TrackType;
 import org.jcodec.containers.mp4.boxes.SampleEntry;
+import org.jcodec.samples.transcode.TranscodeMain;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -58,54 +59,49 @@ public class AVCMP4Mux {
     private static void mux(CompressedTrack track, File f) throws IOException {
         MappedH264ES es = new MappedH264ES(NIOUtils.map(f));
 
-        AvcCBox avcCBox = new AvcCBox();
-
+        ArrayList<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
+        ArrayList<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
         Packet frame = null;
-        int i = 0;
-        do {
-            frame = es.nextFrame();
-            if (frame == null)
-                continue;
-            ByteBuffer data = frame.getData();
-            NALUnit nu = NALUnit.read(data);
-            if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
-
-                MP4Packet pkt = new MP4Packet(formPacket(nu, data), i, 25, 1, i, nu.type == NALUnitType.IDR_SLICE,
-                        null, i, 0);
-                pkt.setDisplayOrder(frame.getDisplayOrder());
-                track.addFrame(pkt);
-                i++;
-            } else if (nu.type == NALUnitType.SPS) {
-                avcCBox.getSpsList().add(data);
-                if (avcCBox.getSpsList().size() == 1) {
-                    addSampleEntry(track, SeqParameterSet.read(data.duplicate()));
-                }
-            } else if (nu.type == NALUnitType.PPS) {
-                avcCBox.getPpsList().add(data);
-            }
-        } while (frame != null);
+        while ((frame = es.nextFrame()) != null) {
+            ByteBuffer wrap = ByteBuffer.wrap(NIOUtils.toArray(frame.getData()));
+            TranscodeMain.processFrame(wrap, spsList, ppsList);
+            MP4Packet pkt = new MP4Packet(new Packet(frame, wrap), frame.getPts(), 0);
+            System.out.println(pkt.getFrameNo());
+            track.addFrame(pkt);
+        }
+        addSampleEntry(track, es.getSps(), es.getPps());
     }
 
-    private static void addSampleEntry(CompressedTrack track, SeqParameterSet sps) {
+    private static void addSampleEntry(CompressedTrack track, SeqParameterSet[] spss, PictureParameterSet[] ppss) {
+        SeqParameterSet sps = spss[0];
         Size size = new Size((sps.pic_width_in_mbs_minus1 + 1) << 4, (sps.pic_height_in_map_units_minus1 + 1) << 4);
 
         SampleEntry se = MP4Muxer.videoSampleEntry("avc1", size, "JCodec");
 
-        avcC = new AvcCBox();
+        avcC = new AvcCBox(sps.profile_idc, 0, sps.level_idc, write(spss), write(ppss));
         se.add(avcC);
         track.addSampleEntry(se);
     }
 
-    void addSP(SeqParameterSet sps, PictureParameterSet pps) {
-
+    private static List<ByteBuffer> write(PictureParameterSet[] ppss) {
+        List<ByteBuffer> result = new ArrayList<ByteBuffer>();
+        for (PictureParameterSet pps : ppss) {
+            ByteBuffer buf = ByteBuffer.allocate(1024);
+            pps.write(buf);
+            buf.flip();
+            result.add(buf);
+        }
+        return result;
     }
 
-    private static ByteBuffer formPacket(NALUnit nu, ByteBuffer nextNALUnit) throws IOException {
-        ByteBuffer out = ByteBuffer.allocate(nextNALUnit.remaining() + 5);
-        out.putInt(nextNALUnit.remaining() + 1);
-        nu.write(out);
-        NIOUtils.write(out, nextNALUnit);
-        out.flip();
-        return out;
+    private static List<ByteBuffer> write(SeqParameterSet[] spss) {
+        List<ByteBuffer> result = new ArrayList<ByteBuffer>();
+        for (SeqParameterSet sps : spss) {
+            ByteBuffer buf = ByteBuffer.allocate(1024);
+            sps.write(buf);
+            buf.flip();
+            result.add(buf);
+        }
+        return result;
     }
 }

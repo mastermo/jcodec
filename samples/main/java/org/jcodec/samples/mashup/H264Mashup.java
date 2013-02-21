@@ -9,13 +9,13 @@ import java.nio.MappedByteBuffer;
 import junit.framework.Assert;
 
 import org.apache.commons.io.IOUtils;
-import org.jcodec.codecs.h264.annexb.H264Utils;
+import org.jcodec.codecs.h264.H264Utils;
+import org.jcodec.codecs.h264.decode.SliceHeaderReader;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.codecs.h264.io.read.SliceHeaderReader;
 import org.jcodec.codecs.h264.io.write.NALUnitWriter;
 import org.jcodec.codecs.h264.io.write.SliceHeaderWriter;
 import org.jcodec.common.NIOUtils;
