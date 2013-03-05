@@ -7,11 +7,11 @@ import static org.jcodec.codecs.prores.ProresConsts.levCodebooks;
 import static org.jcodec.codecs.prores.ProresConsts.runCodebooks;
 import static org.jcodec.codecs.prores.ProresDecoder.bitstream;
 import static org.jcodec.codecs.prores.ProresDecoder.readCodeword;
-import static org.jcodec.codecs.prores.ProresDecoder.toSigned;
 import static org.jcodec.codecs.prores.ProresEncoder.getLevel;
-import static org.jcodec.codecs.prores.ProresEncoder.isNegative;
 import static org.jcodec.codecs.prores.ProresEncoder.writeCodeword;
 import static org.jcodec.common.tools.MathUtil.log2;
+import static org.jcodec.common.tools.MathUtil.sign;
+import static org.jcodec.common.tools.MathUtil.toSigned;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -105,7 +105,7 @@ public class ProresFix {
                     int level = getLevel(val);
                     writeCodeword(bits, levCodebooks[min(prevLevel, 9)], level - 1);
                     prevLevel = level;
-                    bits.write1Bit(isNegative(val));
+                    bits.write1Bit(sign(val));
                 }
             }
         }

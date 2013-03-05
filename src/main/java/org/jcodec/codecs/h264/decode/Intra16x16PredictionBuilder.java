@@ -37,17 +37,17 @@ public class Intra16x16PredictionBuilder {
             int[] topLine, int x) {
         int off = 0;
         for (int j = 0; j < 16; j++) {
-            for (int i = 0; i < 16; i++)
-                residual[off++] = clip(residual[off] + topLine[x + i], 0, 255);
+            for (int i = 0; i < 16; i++, off++)
+                residual[off] = clip(residual[off] + topLine[x + i], 0, 255);
         }
     }
 
     public static void predictHorizontal(int[] residual, boolean leftAvailable, boolean topAvailable, int[] leftRow,
             int[] topLine, int x) {
         int off = 0;
-        for (int j = 0; j < 16; j++) {
-            for (int i = 0; i < 16; i++)
-                residual[off++] = clip(residual[off] + leftRow[j], 0, 255);
+        for (int j = 1; j <= 16; j++) {
+            for (int i = 0; i < 16; i++, off++)
+                residual[off] = clip(residual[off] + leftRow[j], 0, 255);
         }
     }
 
@@ -56,7 +56,7 @@ public class Intra16x16PredictionBuilder {
         int s0;
         if (leftAvailable && topAvailable) {
             s0 = 0;
-            for (int i = 0; i < 16; i++)
+            for (int i = 1; i <= 16; i++)
                 s0 += leftRow[i];
             for (int i = 0; i < 16; i++)
                 s0 += topLine[x + i];
@@ -64,7 +64,7 @@ public class Intra16x16PredictionBuilder {
             s0 = (s0 + 16) >> 5;
         } else if (leftAvailable) {
             s0 = 0;
-            for (int i = 0; i < 16; i++)
+            for (int i = 1; i <= 16; i++)
                 s0 += leftRow[i];
             s0 = (s0 + 8) >> 4;
         } else if (topAvailable) {
@@ -87,23 +87,23 @@ public class Intra16x16PredictionBuilder {
         for (int i = 0; i < 7; i++) {
             H += (i + 1) * (topLine[x + 8 + i] - topLine[x + 6 - i]);
         }
-        H += 8 * (topLine[x + 15] - topLine[x - 1]);
+        H += 8 * (topLine[x + 15] - leftRow[0]);
 
         int V = 0;
-        for (int j = 0; j < 7; j++) {
-            V += (j + 1) * (leftRow[8 + j] - leftRow[6 - j]);
+        for (int j = 1; j <= 7; j++) {
+            V += j * (leftRow[8 + j] - leftRow[8 - j]);
         }
-        V += 8 * (leftRow[15] - topLine[x - 1]);
+        V += 8 * (leftRow[16] - leftRow[0]);
 
         int c = (5 * V + 32) >> 6;
         int b = (5 * H + 32) >> 6;
-        int a = 16 * (leftRow[15] + topLine[x + 15]);
+        int a = 16 * (leftRow[16] + topLine[x + 15]);
 
         int off = 0;
         for (int j = 0; j < 16; j++) {
-            for (int i = 0; i < 16; i++) {
-                int val = (a + b * (i - 7) + c * (j - 7) + 16) >> 5;
-                residual[off++] = clip(residual[off] + val, 0, 255);
+            for (int i = 0; i < 16; i++, off++) {
+                int val = clip((a + b * (i - 7) + c * (j - 7) + 16) >> 5, 0, 255);
+                residual[off] = clip(residual[off] + val, 0, 255);
             }
         }
     }

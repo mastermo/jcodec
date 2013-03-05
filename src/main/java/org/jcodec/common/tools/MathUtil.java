@@ -125,4 +125,12 @@ public class MathUtil {
             return 0;
         return (abs(signedLevel) << 1) - (~signedLevel >>> 31);
     }
+    
+    public static final int toSigned(int val, int sign) {
+        return (val ^ sign) - sign;
+    }
+    
+    public static final int sign(int val) {
+        return -(val >> 31);
+    }
 }

@@ -10,6 +10,7 @@ import static org.jcodec.codecs.prores.ProresConsts.progressive_scan;
 import static org.jcodec.codecs.prores.ProresConsts.runCodebooks;
 import static org.jcodec.common.dct.SimpleIDCT10Bit.idct10;
 import static org.jcodec.common.tools.MathUtil.log2;
+import static org.jcodec.common.tools.MathUtil.toSigned;
 
 import java.nio.ByteBuffer;
 
@@ -81,10 +82,6 @@ public class ProresDecoder implements VideoDecoder {
 
     public static final int golumbSign(int val) {
         return -(val & 1);
-    }
-
-    public static final int toSigned(int val, int sign) {
-        return (val ^ sign) - sign;
     }
 
     public static final void readDCCoeffs(BitReader bits, int[] qMat, int[] out, int blocksPerSlice) {

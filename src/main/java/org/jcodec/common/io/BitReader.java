@@ -131,10 +131,10 @@ public class BitReader {
             curInt |= nextIgnore() << deficit;
         }
         int res = curInt >>> (32 - n);
-//        for (int i = n - 1; i >= 0; i--) {
-//            System.out.print((res >> i) & 0x1);
-//        }
-//        System.out.println();
+        // for (int i = n - 1; i >= 0; i--) {
+        // System.out.print((res >> i) & 0x1);
+        // }
+        // System.out.println();
         return res;
     }
 
@@ -152,5 +152,10 @@ public class BitReader {
 
     public BitReader fork() {
         return new BitReader(this);
+    }
+
+    public void terminate() {
+        int putBack = (32 - deficit) >> 3;
+        bb.position(bb.position() - putBack);
     }
 }

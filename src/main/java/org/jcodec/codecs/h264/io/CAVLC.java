@@ -194,7 +194,7 @@ public class CAVLC {
     }
 
     public int readCoeffs(BitReader in, VLC coeffTokenTab, VLC[] totalZerosTab, int[] coeffLevel, int firstCoeff,
-            int nCoeff, int[] zigzag4x4) {
+            int nCoeff, int[] zigzag) {
         int coeffToken = coeffTokenTab.readVLC(in);
         int totalCoeff = totalCoeff(coeffToken);
         int trailingOnes = trailingOnes(coeffToken);
@@ -266,9 +266,9 @@ public class CAVLC {
             }
             runs[r] = zerosLeft;
 
-            for (int j = totalCoeff - 1, cn = 0; j >= 0; j--, cn++) {
+            for (int j = totalCoeff - 1, cn = 0; j >= 0 && cn < nCoeff; j--, cn++) {
                 cn += runs[j];
-                coeffLevel[cn] = level[j];
+                coeffLevel[zigzag[cn + firstCoeff]] = level[j];
             }
         }
 
@@ -312,12 +312,14 @@ public class CAVLC {
         readCoeffs(reader, coeffTokenTab, H264Const.totalZeros16, coeff, 0, 16, zigzag4x4);
     }
 
-    public void readACBlock(BitReader reader, int[] coeff, int blkIndX, int blkIndY, boolean leftAvailable,
+    public int readACBlock(BitReader reader, int[] coeff, int blkIndX, int blkIndY, boolean leftAvailable,
             boolean topAvailable, int firstCoeff, int nCoeff, int[] zigzag4x4) {
         VLC coeffTokenTab = getCoeffTokenVLCForLuma((blkIndX & mbMask) > 0 || leftAvailable, tokensLeft[blkIndY
                 & mbMask], (blkIndY & mbMask) > 0 || topAvailable, tokensTop[blkIndX]);
 
         int readCoeffs = readCoeffs(reader, coeffTokenTab, H264Const.totalZeros16, coeff, firstCoeff, nCoeff, zigzag4x4);
         tokensLeft[blkIndY & mbMask] = tokensTop[blkIndX] = readCoeffs;
+        
+        return totalCoeff(readCoeffs);
     }
 }

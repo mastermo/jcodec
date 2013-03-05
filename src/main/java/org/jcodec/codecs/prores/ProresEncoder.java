@@ -18,6 +18,7 @@ import static org.jcodec.codecs.prores.ProresConsts.runCodebooks;
 import static org.jcodec.common.dct.DCTRef.fdct;
 import static org.jcodec.common.model.ColorSpace.YUV422_10;
 import static org.jcodec.common.tools.MathUtil.log2;
+import static org.jcodec.common.tools.MathUtil.sign;
 
 import java.nio.ByteBuffer;
 
@@ -26,6 +27,7 @@ import org.jcodec.common.io.BitWriter;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.model.Rect;
 import org.jcodec.common.tools.ImageOP;
+import org.jcodec.common.tools.MathUtil;
 
 /**
  * 
@@ -128,10 +130,6 @@ public class ProresEncoder {
         return (val >> 31) ^ sign;
     }
 
-    public static final int isNegative(int val) {
-        return ((val >> 31) ^ -1) + 1;
-    }
-
     public static final int getLevel(int val) {
         int sign = (val >> 31);
         return (val ^ sign) - sign;
@@ -171,7 +169,7 @@ public class ProresEncoder {
                     int level = getLevel(val);
                     writeCodeword(bits, levCodebooks[min(prevLevel, 9)], level - 1);
                     prevLevel = level;
-                    bits.write1Bit(isNegative(val));
+                    bits.write1Bit(sign(val));
                 }
             }
         }

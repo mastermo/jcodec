@@ -3,12 +3,11 @@ package org.jcodec.codecs.h264.decode.deblock;
 import static java.lang.Math.abs;
 import static org.jcodec.common.tools.MathUtil.clip;
 
-import org.jcodec.codecs.h264.decode.aso.MapManager;
-import org.jcodec.codecs.h264.decode.aso.Mapper;
-import org.jcodec.codecs.h264.io.CAVLC;
 import org.jcodec.codecs.h264.io.model.MBType;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
+import org.jcodec.common.model.ColorSpace;
 import org.jcodec.common.model.Picture;
+import org.jcodec.common.tools.MathUtil;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -51,172 +50,35 @@ public class DeblockingFilter {
             new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3,
                     3, 3, 4, 4, 4, 5, 6, 6, 7, 8, 9, 10, 11, 13, 14, 16, 18, 20, 23, 25 } };
 
-    private int[][] tokens;
-    private int[][] mvs;
+    private int[][][] nCoeff;
+    private int[][][] mvs;
     private MBType[] mbTypes;
     private int[][] mbQps;
+    private SliceHeader[] shs;
 
-    public DeblockingFilter(int bitDepthLuma, int bitDepthChroma, int[][] tokens, int[][] mvs, MBType[] mbTypes, int[][] mbQps) {
-        this.tokens = tokens;
+    public DeblockingFilter(int bitDepthLuma, int bitDepthChroma, int[][][] nCoeff, int[][][] mvs, MBType[] mbTypes,
+            int[][] mbQps, SliceHeader[] shs) {
+        this.nCoeff = nCoeff;
         this.mvs = mvs;
         this.mbTypes = mbTypes;
         this.mbQps = mbQps;
+        this.shs = shs;
     }
 
-    public void deblockSlice(Picture decoded, SliceHeader sh) {
-        Mapper mapper = new MapManager(sh.sps, sh.pps).getMapper(sh);
-
-        for (int mbIdx = 0;; mbIdx++) {
-            doOneMB(decoded, mbIdx, sh, mbQps, mapper);
+    public void deblockFrame(Picture result) {
+        ColorSpace color = result.getColor();
+        for (int c = 0; c < color.nComp; c++) {
+            for (int i = 0; i < shs.length; i++) {
+                fillVerticalEdge(result, c, i, 2 - color.compWidth[c], 2 - color.compHeight[c]);
+                fillHorizontalEdge(result, c, i, 2 - color.compWidth[c], 2 - color.compHeight[c]);
+            }
         }
-    }
-
-    private void doOneMB(Picture decoded, int mbIdx, SliceHeader sh, int[][] mbQps, Mapper mapper) {
-        boolean leftAvailable = mapper.leftAvailable(mbIdx);
-        boolean topAvailable = mapper.topAvailable(mbIdx);
-        int mbX = mapper.getMbX(mbIdx);
-        int mbY = mapper.getMbY(mbIdx);
-        int mbWidth = sh.sps.pic_width_in_mbs_minus1 + 1;
-
-        int thisAddr = mbY * mbWidth + mbX;
-        int leftAddr = thisAddr - 1;
-        int topAddr = (mbY - 1) * mbWidth + mbX;
-
-        boolean thisIntra = (mbTypes[thisAddr] == MBType.I_16x16) || (mbTypes[thisAddr] == MBType.I_NxN);
-        boolean leftIntra = leftAvailable && (mbTypes[leftAddr] == MBType.I_16x16)
-                || (mbTypes[leftAddr] == MBType.I_NxN);
-        boolean topIntra = topAvailable && (mbTypes[topAddr] == MBType.I_16x16) || (mbTypes[topAddr] == MBType.I_NxN);
-
-        int[] bsV = new int[16];
-        if (leftAvailable) {
-            bsV[0] = calcBoundaryStrenth(3, 0, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-            bsV[4] = calcBoundaryStrenth(7, 4, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-            bsV[8] = calcBoundaryStrenth(11, 8, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-            bsV[12] = calcBoundaryStrenth(15, 12, true, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        }
-
-        bsV[1] = calcBoundaryStrenth(0, 1, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[2] = calcBoundaryStrenth(1, 2, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[3] = calcBoundaryStrenth(2, 3, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        bsV[5] = calcBoundaryStrenth(4, 5, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[6] = calcBoundaryStrenth(5, 6, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[7] = calcBoundaryStrenth(6, 7, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        bsV[9] = calcBoundaryStrenth(8, 9, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[10] = calcBoundaryStrenth(9, 10, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[11] = calcBoundaryStrenth(10, 11, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        bsV[13] = calcBoundaryStrenth(12, 13, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[14] = calcBoundaryStrenth(13, 14, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsV[15] = calcBoundaryStrenth(14, 15, false, leftIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        int[] bsH = new int[16];
-        if (topAvailable) {
-            bsH[0] = calcBoundaryStrenth(12, 0, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-            bsH[1] = calcBoundaryStrenth(13, 1, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-            bsH[2] = calcBoundaryStrenth(14, 2, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-            bsH[3] = calcBoundaryStrenth(15, 3, true, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                    tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        }
-
-        bsH[4] = calcBoundaryStrenth(0, 4, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[5] = calcBoundaryStrenth(1, 5, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[6] = calcBoundaryStrenth(2, 6, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[7] = calcBoundaryStrenth(3, 7, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        bsH[8] = calcBoundaryStrenth(4, 8, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[9] = calcBoundaryStrenth(5, 9, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[10] = calcBoundaryStrenth(6, 10, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[11] = calcBoundaryStrenth(7, 11, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        bsH[12] = calcBoundaryStrenth(8, 12, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[13] = calcBoundaryStrenth(9, 13, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[14] = calcBoundaryStrenth(10, 14, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-        bsH[15] = calcBoundaryStrenth(11, 15, false, topIntra, thisIntra, tokens[0][(mbY << 2) + mbX],
-                tokens[0][(mbY << 2) + mbX], mvs[(mbY << 2) + mbX], mvs[(mbY << 2) + mbX]);
-
-        doOneComponent(decoded, 0, mbX << 2, mbY << 2, bsV, bsH, sh.slice_alpha_c0_offset_div2 << 1,
-                sh.slice_beta_offset_div2 << 1, sh.disable_deblocking_filter_idc, mbQps[0][thisAddr], leftAvailable,
-                leftAvailable ? mbQps[0][leftAddr] : null, topAvailable, topAvailable ? mbQps[0][topAddr] : null);
-
-        doOneComponent(decoded, 1, mbX << 1, mbY << 1, bsV, bsH, sh.slice_alpha_c0_offset_div2 << 1,
-                sh.slice_beta_offset_div2 << 1, sh.disable_deblocking_filter_idc, mbQps[1][thisAddr], leftAvailable,
-                leftAvailable ? mbQps[1][leftAddr] : null, topAvailable, topAvailable ? mbQps[1][topAddr] : null);
-
-        doOneComponent(decoded, 2, mbX << 1, mbY << 1, bsV, bsH, sh.slice_alpha_c0_offset_div2 << 1,
-                sh.slice_beta_offset_div2 << 1, sh.disable_deblocking_filter_idc, mbQps[2][thisAddr], leftAvailable,
-                leftAvailable ? mbQps[2][leftAddr] : null, topAvailable, topAvailable ? mbQps[2][topAddr] : null);
     }
 
     static int[] inverse = new int[] { 0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15 };
 
-    private void doOneComponent(Picture decoded, int comp, int mbX, int mbY, int[] bsV, int bsH[], int alphaC0Offset,
-            int betaOffset, int disableDeblockingFilterIdc, int curQp, boolean leftAvailable, int leftQp,
-            boolean topAvailable, int topQp) {
-
-        int[] alphaV = new int[4];
-        int[] betaV = new int[4];
-        if (leftAvailable) {
-            int avgQpV = (leftQp + curQp + 1) >> 1;
-            alphaV[0] = getIdxAlpha(alphaC0Offset, avgQpV);
-            betaV[0] = getIdxBeta(betaOffset, avgQpV);
-        }
-
-        int[] alphaH = new int[4];
-        int[] betaH = new int[4];
-        if (topAvailable) {
-            int avgQpH = (topQp + curQp + 1) >> 1;
-            alphaH[0] = getIdxAlpha(alphaC0Offset, avgQpH);
-            betaH[0] = getIdxBeta(betaOffset, avgQpH);
-        }
-
-        alphaV[1] = alphaV[2] = alphaV[3] = alphaH[1] = alphaH[2] = alphaH[3] = getIdxAlpha(alphaC0Offset, curQp);
-        betaV[1] = betaV[2] = betaV[3] = betaH[1] = betaH[2] = betaH[3] = getIdxBeta(betaOffset, curQp);
-
-        if (disableDeblockingFilterIdc == 0) {
-            throw new RuntimeException("Unclear, verify");
-            // enabled = true;
-            // filterLeft = leftDec != null;
-            // filterTop = topDec != null;
-        } else if (disableDeblockingFilterIdc == 2) {
-            fillVerticalEdge(decoded, comp, mbY, mbX, alphaV, betaV, bsV, leftAvailable);
-            fillHorizontalEdge(decoded, comp, mbY, mbX, alphaH, betaH, bsH, topAvailable);
-        }
-    }
-
-    private int calcBoundaryStrenth(int blkAAddr, int blkBAddr, boolean atMbBoundary, boolean leftIntra,
-            boolean rightIntra, int leftToken, int rightToken, int[] mvA, int[] mvB) {
+    private int calcBoundaryStrenth(boolean atMbBoundary, boolean leftIntra, boolean rightIntra, int leftCoeff,
+            int rightCoeff, int[] mvA, int[] mvB) {
 
         if (atMbBoundary && (leftIntra || rightIntra))
             return 4;
@@ -224,7 +86,7 @@ public class DeblockingFilter {
             return 3;
         else {
 
-            if (CAVLC.totalCoeff(leftToken) > 0 || CAVLC.totalCoeff(rightToken) > 0)
+            if (leftCoeff > 0 || rightCoeff > 0)
                 return 2;
 
             if (mvA[2] == -1 && mvB[2] >= 0)
@@ -238,8 +100,8 @@ public class DeblockingFilter {
                 if (true)
                     throw new RuntimeException("Check actual refs for reordering");
 
-//                if (leftRef != rightRef)
-//                    return 1;
+                // if (leftRef != rightRef)
+                // return 1;
 
                 if (abs(mvA[0] - mvB[0]) >= 4 || abs(mvA[1] - mvB[1]) >= 4)
                     return 1;
@@ -250,37 +112,93 @@ public class DeblockingFilter {
     }
 
     private static int getIdxBeta(int sliceBetaOffset, int avgQp) {
-        int idxB = avgQp + sliceBetaOffset;
-        idxB = idxB > 51 ? idxB = 51 : (idxB < 0 ? idxB = 0 : idxB);
-
-        return idxB;
+        return MathUtil.clip(avgQp + sliceBetaOffset, 0, 51);
     }
 
     private static int getIdxAlpha(int sliceAlphaC0Offset, int avgQp) {
-        int idxA = avgQp + sliceAlphaC0Offset;
-        idxA = idxA > 51 ? idxA = 51 : (idxA < 0 ? idxA = 0 : idxA);
-
-        return idxA;
+        return MathUtil.clip(avgQp + sliceAlphaC0Offset, 0, 51);
     }
 
-    private void fillHorizontalEdge(Picture pic, int comp, int x, int y, int[] alpha, int[] beta, int[] bs,
-            boolean filterTop) {
+    private void fillHorizontalEdge(Picture pic, int comp, int mbAddr, int cW, int cH) {
+        SliceHeader sh = shs[mbAddr];
+        int mbWidth = sh.sps.pic_width_in_mbs_minus1 + 1;
 
-        for (int blkY = filterTop ? 0 : 1; blkY < 4; blkY++) {
-            for (int blkX = 0; blkX < 4; blkX++) {
-                filterBlockEdgeHoris(pic, comp, x + (blkX << 2), y + (blkY << 2), alpha[blkY], beta[blkY],
-                        bs[(blkY << 2) + blkX]);
+        int alpha = sh.slice_alpha_c0_offset_div2 << 1;
+        int beta = sh.slice_beta_offset_div2 << 1;
+
+        int mbX = mbAddr % mbWidth;
+        int mbY = mbAddr / mbWidth;
+
+        boolean topAvailable = mbY > 0 && (sh.disable_deblocking_filter_idc != 2 || shs[mbAddr - mbWidth] == sh);
+        boolean thisIntra = mbTypes[mbAddr].isIntra();
+        int curQp = mbQps[comp][mbAddr];
+
+        if (topAvailable) {
+            boolean topIntra = mbTypes[mbAddr - mbWidth].isIntra();
+            int topQp = mbQps[comp][mbAddr - mbWidth];
+            int avgQp = (topQp + curQp + 1) >> 1;
+            for (int blkX = 0; blkX < (1 << cW); blkX++) {
+                int thisBlkX = (mbX << cW) + blkX;
+                int thisBlkY = (mbY << cH);
+
+                int bs = calcBoundaryStrenth(true, topIntra, thisIntra, nCoeff[comp][thisBlkY][thisBlkX],
+                        nCoeff[comp][thisBlkY - 1][thisBlkX], mvs[thisBlkY][thisBlkX], mvs[thisBlkY - 1][thisBlkX]);
+
+                filterBlockEdgeHoris(pic, comp, thisBlkX << 2, thisBlkY << 2, getIdxAlpha(alpha, avgQp),
+                        getIdxBeta(beta, avgQp), bs);
+            }
+        }
+
+        for (int blkY = 1; blkY < (1 << cH); blkY++) {
+            for (int blkX = 0; blkX < (1 << cW); blkX++) {
+                int thisBlkX = (mbX << cW) + blkX;
+                int thisBlkY = (mbY << cH) + blkY;
+
+                int bs = calcBoundaryStrenth(false, thisIntra, thisIntra, nCoeff[comp][thisBlkY][thisBlkX],
+                        nCoeff[comp][thisBlkY - 1][thisBlkX], mvs[thisBlkY][thisBlkX], mvs[thisBlkY - 1][thisBlkX]);
+
+                filterBlockEdgeHoris(pic, comp, thisBlkX << 2, thisBlkY << 2, getIdxAlpha(alpha, curQp),
+                        getIdxBeta(beta, curQp), bs);
             }
         }
     }
 
-    private void fillVerticalEdge(Picture pic, int comp, int x, int y, int[] alpha, int[] beta, int[] bs,
-            boolean filterLeft) {
+    private void fillVerticalEdge(Picture pic, int comp, int mbAddr, int cW, int cH) {
+        SliceHeader sh = shs[mbAddr];
+        int mbWidth = sh.sps.pic_width_in_mbs_minus1 + 1;
 
-        for (int blkX = filterLeft ? 0 : 1; blkX < 4; blkX++) {
-            for (int blkY = 0; blkY < 4; blkY++) {
-                filterBlockEdgeVert(pic, comp, x + (blkX << 2), y + (blkY << 2), alpha[blkX], beta[blkX],
-                        bs[(blkY << 2) + blkX]);
+        int alpha = sh.slice_alpha_c0_offset_div2 << 1;
+        int beta = sh.slice_beta_offset_div2 << 1;
+
+        int mbX = mbAddr % mbWidth;
+        int mbY = mbAddr / mbWidth;
+
+        boolean leftAvailable = mbX > 0 && (sh.disable_deblocking_filter_idc != 2 || shs[mbAddr - 1] == sh);
+        boolean thisIntra = mbTypes[mbAddr].isIntra();
+        int curQp = mbQps[comp][mbAddr];
+
+        if (leftAvailable) {
+            boolean leftIntra = mbTypes[mbAddr - 1].isIntra();
+            int leftQp = mbQps[comp][mbAddr - 1];
+            int avgQpV = (leftQp + curQp + 1) >> 1;
+            for (int blkY = 0; blkY < (1 << cH); blkY++) {
+                int thisBlkX = (mbX << cW);
+                int thisBlkY = (mbY << cH) + blkY;
+                int bs = calcBoundaryStrenth(true, leftIntra, thisIntra, nCoeff[comp][thisBlkY][thisBlkX],
+                        nCoeff[comp][thisBlkY][thisBlkX - 1], mvs[thisBlkY][thisBlkX], mvs[thisBlkY][thisBlkX - 1]);
+                filterBlockEdgeVert(pic, comp, thisBlkX << 2, thisBlkY << 2, getIdxAlpha(alpha, avgQpV),
+                        getIdxBeta(beta, avgQpV), bs);
+            }
+        }
+
+        for (int blkX = 1; blkX < (1 << cW); blkX++) {
+            for (int blkY = 0; blkY < (1 << cH); blkY++) {
+                int thisBlkX = (mbX << cW) + blkX;
+                int thisBlkY = (mbY << cH) + blkY;
+                int bs = calcBoundaryStrenth(false, thisIntra, thisIntra, nCoeff[comp][thisBlkY][thisBlkX],
+                        nCoeff[comp][thisBlkY][thisBlkX - 1], mvs[thisBlkY][thisBlkX], mvs[thisBlkY][thisBlkX - 1]);
+                filterBlockEdgeVert(pic, comp, thisBlkX << 2, thisBlkY << 2, getIdxAlpha(alpha, curQp),
+                        getIdxBeta(beta, curQp), bs);
             }
         }
     }

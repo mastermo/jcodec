@@ -18,22 +18,27 @@ public class ChromaPredictionBuilder {
 
         switch (chromaMode) {
         case 0:
-            predictDCInside(planeData, 0, 0, mbX, leftAvailable, topAvailable, leftRow, topLine);
-            predictDCTopBorder(planeData, 0, 1, mbX, leftAvailable, topAvailable, leftRow, topLine);
-            predictDCLeftBorder(planeData, 1, 0, mbX, leftAvailable, topAvailable, leftRow, topLine);
-            predictDCInside(planeData, 1, 1, mbX, leftAvailable, topAvailable, leftRow, topLine);
+            predictDC(planeData, mbX, leftAvailable, topAvailable, leftRow, topLine);
             break;
         case 1:
-            predictVertical(planeData, mbX, leftAvailable, topAvailable, leftRow, topLine);
+            predictHorizontal(planeData, mbX, leftAvailable, topAvailable, leftRow, topLine);
             break;
         case 2:
-            predictHorizontal(planeData, mbX, leftAvailable, topAvailable, leftRow, topLine);
+        	predictVertical(planeData, mbX, leftAvailable, topAvailable, leftRow, topLine);
             break;
         case 3:
             predictPlane(planeData, mbX, leftAvailable, topAvailable, leftRow, topLine);
             break;
         }
 
+    }
+
+    public static void predictDC(int[] planeData, int mbX, boolean leftAvailable, boolean topAvailable, int[] leftRow,
+            int[] topLine) {
+        predictDCInside(planeData, 0, 0, mbX, leftAvailable, topAvailable, leftRow, topLine);
+        predictDCTopBorder(planeData, 1, 0, mbX, leftAvailable, topAvailable, leftRow, topLine);
+        predictDCLeftBorder(planeData, 0, 1, mbX, leftAvailable, topAvailable, leftRow, topLine);
+        predictDCInside(planeData, 1, 1, mbX, leftAvailable, topAvailable, leftRow, topLine);
     }
 
     public static void predictVertical(int[] planeData, int mbX, boolean leftAvailable, boolean topAvailable,
@@ -46,7 +51,7 @@ public class ChromaPredictionBuilder {
 
     public static void predictHorizontal(int[] planeData, int mbX, boolean leftAvailable, boolean topAvailable,
             int[] leftRow, int[] topLine) {
-        for (int off = 0, j = 0; j < 8; j++) {
+        for (int off = 0, j = 1; j <= 8; j++) {
             for (int i = 0; i < 8; i++, off++)
                 planeData[off] = clip(planeData[off] + leftRow[j], 0, 255);
         }
@@ -59,7 +64,7 @@ public class ChromaPredictionBuilder {
 
         if (leftAvailable && topAvailable) {
             s0 = 0;
-            for (int i = 0; i < 4; i++)
+            for (int i = 1; i <= 4; i++)
                 s0 += leftRow[i + blkOffY];
             for (int i = 0; i < 4; i++)
                 s0 += topLine[blkOffX + i];
@@ -67,7 +72,7 @@ public class ChromaPredictionBuilder {
             s0 = (s0 + 4) >> 3;
         } else if (leftAvailable) {
             s0 = 0;
-            for (int i = 0; i < 4; i++)
+            for (int i = 1; i <= 4; i++)
                 s0 += leftRow[blkOffY + i];
             s0 = (s0 + 2) >> 2;
         } else if (topAvailable) {
@@ -79,7 +84,7 @@ public class ChromaPredictionBuilder {
             s0 = 128;
         }
 
-        for (int off = (blkY << 3) + blkX, j = 0; j < 4; j++, off += 8) {
+        for (int off = (blkY << 5) + (blkX << 2), j = 0; j < 4; j++, off += 8) {
             planeData[off] = clip(planeData[off] + s0, 0, 255);
             planeData[off + 1] = clip(planeData[off + 1] + s0, 0, 255);
             planeData[off + 2] = clip(planeData[off + 2] + s0, 0, 255);
@@ -99,14 +104,14 @@ public class ChromaPredictionBuilder {
             s1 = (s1 + 2) >> 2;
         } else if (leftAvailable) {
             s1 = 0;
-            for (int i = 0; i < 4; i++)
+            for (int i = 1; i <= 4; i++)
                 s1 += leftRow[blkOffY + i];
             s1 = (s1 + 2) >> 2;
         } else {
             s1 = 128;
         }
 
-        for (int off = (blkY << 3) + blkX, j = 0; j < 4; j++, off += 8) {
+        for (int off = (blkY << 5) + (blkX << 2), j = 0; j < 4; j++, off += 8) {
             planeData[off] = clip(planeData[off] + s1, 0, 255);
             planeData[off + 1] = clip(planeData[off + 1] + s1, 0, 255);
             planeData[off + 2] = clip(planeData[off + 2] + s1, 0, 255);
@@ -120,7 +125,7 @@ public class ChromaPredictionBuilder {
         int s2, blkOffX = (blkX << 2) + (mbX << 3), blkOffY = blkY << 2;
         if (leftAvailable) {
             s2 = 0;
-            for (int i = 0; i < 4; i++)
+            for (int i = 1; i <= 4; i++)
                 s2 += leftRow[blkOffY + i];
             s2 = (s2 + 2) >> 2;
         } else if (topAvailable) {
@@ -129,10 +134,10 @@ public class ChromaPredictionBuilder {
                 s2 += topLine[blkOffX + i];
             s2 = (s2 + 2) >> 2;
         } else {
-            s2 = 1 << 128;
+            s2 = 128;
         }
 
-        for (int off = (blkY << 3) + blkX, j = 0; j < 4; j++, off += 8) {
+        for (int off = (blkY << 5) + (blkX << 2), j = 0; j < 4; j++, off += 8) {
             planeData[off] = clip(planeData[off] + s2, 0, 255);
             planeData[off + 1] = clip(planeData[off + 1] + s2, 0, 255);
             planeData[off + 2] = clip(planeData[off + 2] + s2, 0, 255);
@@ -147,17 +152,17 @@ public class ChromaPredictionBuilder {
         for (int i = 0; i < 3; i++) {
             H += (i + 1) * (topLine[blkOffX + 4 + i] - topLine[blkOffX + 2 - i]);
         }
-        H += 4 * (topLine[blkOffX + 7] - topLine[blkOffX - 1]);
+        H += 4 * (topLine[blkOffX + 7] - leftRow[0]);
 
         int V = 0;
-        for (int j = 0; j < 3; j++) {
-            V += (j + 1) * (leftRow[4 + j] - leftRow[2 - j]);
+        for (int j = 1; j <= 3; j++) {
+            V += j * (leftRow[4 + j] - leftRow[4 - j]);
         }
-        V += 4 * (leftRow[7] - topLine[blkOffX - 1]);
+        V += 4 * (leftRow[8] - leftRow[0]);
 
         int c = (34 * V + 32) >> 6;
         int b = (34 * H + 32) >> 6;
-        int a = 16 * (leftRow[7] + topLine[blkOffX + 7]);
+        int a = 16 * (leftRow[8] + topLine[blkOffX + 7]);
 
         for (int off = 0, j = 0; j < 8; j++) {
             for (int i = 0; i < 8; i++, off++) {

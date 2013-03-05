@@ -12,7 +12,6 @@ import org.jcodec.codecs.h264.io.model.RefPicMarking;
 import org.jcodec.codecs.h264.io.model.RefPicMarking.InstrType;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.common.NIOUtils;
 import org.jcodec.common.io.BitReader;
 import org.jcodec.common.model.Packet;
 
@@ -54,7 +53,7 @@ public class MappedH264ES {
             ByteBuffer buf = H264Utils.nextNALUnit(bb);
             if (buf == null)
                 break;
-            NIOUtils.skip(buf, 4);
+//            NIOUtils.skip(buf, 4);
             NALUnit nu = NALUnit.read(buf);
 
             if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
@@ -120,7 +119,7 @@ public class MappedH264ES {
         if (detectGap(sh, maxFrameNum)) {
             issueNonExistingPic(sh, maxFrameNum);
         }
-        System.out.println("----" + sh.frame_num);
+//        System.out.println("----" + sh.frame_num);
         int absFrameNum = updateFrameNumber(sh.frame_num, maxFrameNum, detectMMCO5(sh.refPicMarkingNonIDR));
 
         int poc = 0;

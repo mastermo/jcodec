@@ -13,8 +13,24 @@ import java.nio.ByteOrder;
 public class H264Utils {
 
     public static ByteBuffer nextNALUnit(ByteBuffer buf) {
-        gotoNALUnit(buf, 0);
-        return gotoNALUnit(buf, 1);
+        skipToNALUnit(buf);
+        return gotoNALUnit(buf);
+    }
+
+    public static final void skipToNALUnit(ByteBuffer buf) {
+
+        if (!buf.hasRemaining())
+            return;
+
+        int val = 0xffffffff;
+        while (buf.hasRemaining()) {
+            val <<= 8;
+            val |= (buf.get() & 0xff);
+            if ((val & 0xffffff) == 1) {
+                buf.position(buf.position());
+                break;
+            }
+        }
     }
 
     /**
@@ -28,7 +44,7 @@ public class H264Utils {
      * @param buf
      * @return
      */
-    public static final ByteBuffer gotoNALUnit(ByteBuffer buf, int n) {
+    public static final ByteBuffer gotoNALUnit(ByteBuffer buf) {
 
         if (!buf.hasRemaining())
             return null;
@@ -40,14 +56,11 @@ public class H264Utils {
         int val = 0xffffffff;
         while (buf.hasRemaining()) {
             val <<= 8;
-            val |= buf.get();
-            if (val == 1) {
-                if (n == 0) {
-                    buf.position(buf.position() - 4);
-                    result.limit(buf.position() - from);
-                    break;
-                }
-                --n;
+            val |= (buf.get() & 0xff);
+            if ((val & 0xffffff) == 1) {
+                buf.position(buf.position() - (val == 1 ? 4 : 3));
+                result.limit(buf.position() - from);
+                break;
             }
         }
         return result;

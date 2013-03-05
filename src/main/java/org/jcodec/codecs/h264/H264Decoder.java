@@ -1,6 +1,7 @@
 package org.jcodec.codecs.h264;
 
 import static org.jcodec.codecs.h264.H264Utils.unescapeNAL;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.nio.ByteBuffer;
@@ -48,6 +49,11 @@ public class H264Decoder implements VideoDecoder {
     public H264Decoder() {
         pictureBuffer = new ArrayList<Picture>();
     }
+    
+    H264Decoder(Picture[] references) {
+        this();
+        this.references = references;
+    }
 
     @Override
     public Picture decodeFrame(ByteBuffer data, int[][] buffer) {
@@ -66,10 +72,9 @@ public class H264Decoder implements VideoDecoder {
         public Picture decodeFrame(ByteBuffer data, int[][] buffer) {
             Picture result = null;
 
-            List<SliceHeader> headers = new ArrayList<SliceHeader>();
             ByteBuffer segment;
             while ((segment = H264Utils.nextNALUnit(data)) != null) {
-                NIOUtils.skip(segment, 4);
+//                NIOUtils.skip(segment, 4);
                 NALUnit marker = NALUnit.read(segment);
 
                 unescapeNAL(segment);
@@ -78,10 +83,8 @@ public class H264Decoder implements VideoDecoder {
                 case NON_IDR_SLICE:
                 case IDR_SLICE:
                     if (result == null)
-                        init(buffer, segment, marker);
-                    if (activePps.entropy_coding_mode_flag)
-                        throw new RuntimeException("CABAC!!!");
-                    headers.add(decoder.decode(segment, marker));
+                        result = init(buffer, segment, marker);
+                    decoder.decode(segment, marker);
                     break;
                 case SPS:
                     SeqParameterSet _sps = SeqParameterSet.read(segment);
@@ -95,8 +98,7 @@ public class H264Decoder implements VideoDecoder {
                 }
             }
 
-            for (SliceHeader sh : headers)
-                filter.deblockSlice(result, sh);
+            filter.deblockFrame(result);
 
             updateReferences(result);
 
@@ -125,16 +127,17 @@ public class H264Decoder implements VideoDecoder {
             int picWidthInMbs = activeSps.pic_width_in_mbs_minus1 + 1;
             int picHeightInMbs = activeSps.pic_height_in_map_units_minus1 + 1;
 
-            int[][] tokens = new int[3][picHeightInMbs * picHeightInMbs << 4];
-            int[][] mvs = new int[3][picHeightInMbs * picHeightInMbs << 4];
+            int[][][] nCoeff = new int[3][picHeightInMbs << 2][picHeightInMbs << 2];
+            int[][][] mvs = new int[picHeightInMbs << 2][picHeightInMbs << 2][3];
             MBType[] mbTypes = new MBType[picHeightInMbs * picHeightInMbs];
             int[][] mbQps = new int[3][picHeightInMbs * picHeightInMbs];
+            SliceHeader[] shs = new SliceHeader[picHeightInMbs * picHeightInMbs];
             Picture result = createPicture(activeSps, buffer);
 
-            decoder = new SliceDecoder(activeSps, activePps, tokens, mvs, mbTypes, mbQps, result, references, nLongTerm);
+            decoder = new SliceDecoder(activeSps, activePps, nCoeff, mvs, mbTypes, mbQps, shs, result, references, nLongTerm);
 
-            filter = new DeblockingFilter(picWidthInMbs, activeSps.bit_depth_chroma_minus8 + 8, tokens, mvs, mbTypes,
-                    mbQps);
+            filter = new DeblockingFilter(picWidthInMbs, activeSps.bit_depth_chroma_minus8 + 8, nCoeff, mvs, mbTypes,
+                    mbQps, shs);
 
             return result;
         }

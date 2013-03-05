@@ -399,7 +399,7 @@ public class MP4Demuxer {
             tse = (TimecodeSampleEntry) box.getSampleEntries()[0];
         }
 
-        public MP4Packet getTimecode(MP4Packet pkt) throws IOException {
+        public MP4Packet getTimecode(MP4Packet pkt) {
 
             long tv = QTTimeUtil
                     .editedToMedia(box, box.rescale(pkt.getPts(), pkt.getTimescale()), movie.getTimescale());
