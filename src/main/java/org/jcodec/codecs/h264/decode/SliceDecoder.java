@@ -354,7 +354,7 @@ public class SliceDecoder {
             Picture mb, int cbpLuma) {
         int[] dc = new int[16];
         if (!activePps.entropy_coding_mode_flag)
-            cavlc[0].readLumaDCBlock(reader, dc, leftAvailable, topAvailable, CoeffTransformer.zigzag4x4);
+            cavlc[0].readLumaDCBlock(reader, dc, mbX, leftAvailable, topAvailable, CoeffTransformer.zigzag4x4);
         else {
             if (cabac.readCodedBlockFlagLumaDC(mDecoder, mbX, leftMBType, topMBType[mbX], leftAvailable, topAvailable,
                     MBType.I_16x16) == 1)
