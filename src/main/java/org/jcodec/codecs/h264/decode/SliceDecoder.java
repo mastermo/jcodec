@@ -11,6 +11,7 @@ import static org.jcodec.codecs.h264.decode.CoeffTransformer.reorderDC4x4;
 import static org.jcodec.common.model.ColorSpace.MONO;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.jcodec.codecs.common.biari.MDecoder;
 import org.jcodec.codecs.h264.H264Const;
@@ -53,6 +54,7 @@ public class SliceDecoder {
     private int qp;
     private int[][] leftRow;
     private int[][] topLine;
+    private int[][] topLeft;
 
     private int[] i4x4PredTop;
     private int[] i4x4PredLeft;
@@ -125,7 +127,8 @@ public class SliceDecoder {
         mvTop = new int[(sh.sps.pic_width_in_mbs_minus1 + 1) << 2][3];
         mvLeft = new int[4][3];
 
-        leftRow = new int[3][17];
+        leftRow = new int[3][16];
+        topLeft = new int[3][4];
         topLine = new int[3][(sh.sps.pic_width_in_mbs_minus1 + 1) << 4];
 
         shr.readPart2(sh, nalUnit, sh.sps, sh.pps, in);
@@ -157,6 +160,7 @@ public class SliceDecoder {
                     int mbAddr = mapper.getAddress(i);
                     shs[mbAddr] = sh;
                     put(result, mb, mapper.getMbX(j), mapper.getMbY(j));
+                    wipe(mb);
                 }
 
                 prevMbSkipped = mbSkipRun > 0;
@@ -182,13 +186,19 @@ public class SliceDecoder {
 
             put(result, mb, mbX, mbY);
 
-            collectPredictors(mb, mbX);
-
             if (activePps.entropy_coding_mode_flag && mDecoder.decodeFinalBin() == 1)
                 break;
             else if (!activePps.entropy_coding_mode_flag && !moreRBSPData(in))
                 break;
+            
+            wipe(mb);
         }
+    }
+
+    private void wipe(Picture mb) {
+        Arrays.fill(mb.getPlaneData(0), 0);
+        Arrays.fill(mb.getPlaneData(1), 0);
+        Arrays.fill(mb.getPlaneData(2), 0);
     }
 
     public Picture[] buildRefList(Picture[] buf, int nLongTerm, RefPicReordering refPicReordering) {
@@ -212,21 +222,29 @@ public class SliceDecoder {
     }
 
     private void collectPredictors(Picture outMB, int mbX) {
-        leftRow[0][0] = topLine[0][(mbX << 4) + 15];
-        leftRow[1][0] = topLine[1][(mbX << 3) + 7];
-        leftRow[2][0] = topLine[2][(mbX << 3) + 7];
-
+        topLeft[0][0] = topLine[0][(mbX << 4) + 15];
+        topLeft[0][1] = outMB.getPlaneData(0)[63];
+        topLeft[0][2] = outMB.getPlaneData(0)[127];
+        topLeft[0][3] = outMB.getPlaneData(0)[191];
         System.arraycopy(outMB.getPlaneData(0), 240, topLine[0], mbX << 4, 16);
+        copyCol(outMB.getPlaneData(0), 16, 15, 16, leftRow[0]);
+        
+        collectChromaPredictors(outMB, mbX);
+    }
+
+    private void collectChromaPredictors(Picture outMB, int mbX) {
+        topLeft[1][0] = topLine[1][(mbX << 3) + 7];
+        topLeft[2][0] = topLine[2][(mbX << 3) + 7];
+
         System.arraycopy(outMB.getPlaneData(1), 56, topLine[1], mbX << 3, 8);
         System.arraycopy(outMB.getPlaneData(2), 56, topLine[2], mbX << 3, 8);
 
-        copyCol(outMB.getPlaneData(0), 16, 15, 16, leftRow[0]);
         copyCol(outMB.getPlaneData(1), 8, 7, 8, leftRow[1]);
         copyCol(outMB.getPlaneData(2), 8, 7, 8, leftRow[2]);
     }
 
     private void copyCol(int[] planeData, int n, int off, int stride, int[] out) {
-        for (int i = 1; i <= n; i++, off += stride) {
+        for (int i = 0; i < n; i++, off += stride) {
             out[i] = planeData[off];
         }
     }
@@ -256,14 +274,14 @@ public class SliceDecoder {
     private MBType decodeMBlockIInt(int mbType, int mbIdx, BitReader reader, boolean field, MBType prevMbType,
             Picture mb) {
         if (mbType == 0) {
-            decodeMBlockIntraNxN(reader, mbIdx, mb);
+            decodeMBlockIntraNxN(reader, mbIdx, prevMbType, mb);
             return MBType.I_NxN;
         } else if (mbType >= 1 && mbType <= 24) {
             mbType--;
             decodeMBlockIntra16x16(reader, mbType, mbIdx, prevMbType, mb);
             return MBType.I_16x16;
         } else {
-            decodeMBlockIPCM(reader, mb);
+            decodeMBlockIPCM(reader, mbIdx, mb);
             return MBType.I_PCM;
         }
     }
@@ -326,28 +344,43 @@ public class SliceDecoder {
         boolean leftAvailable = mapper.leftAvailable(mbIndex);
         boolean topAvailable = mapper.topAvailable(mbIndex);
 
-        int chromaPredictionMode;
-        int mbQPDelta;
-        if (!activePps.entropy_coding_mode_flag) {
-            chromaPredictionMode = readUE(reader, "MBP: intra_chroma_pred_mode");
-            mbQPDelta = readSE(reader, "mb_qp_delta");
-        } else {
-            chromaPredictionMode = cabac.readIntraChromaPredMode(mDecoder, mbX, leftMBType, topMBType[mbX],
-                    leftAvailable, topAvailable);
-            mbQPDelta = cabac.readMBQpDelta(mDecoder, prevMbType);
-        }
+        int chromaPredictionMode = readChromaPredMode(reader, mbX, leftAvailable, topAvailable);
+        int mbQPDelta = readMBQpDelta(reader, prevMbType);
         qp = (qp + mbQPDelta + 52) % 52;
         mbQps[0][address] = qp;
 
         residualLumaI16x16(reader, leftAvailable, topAvailable, mbX, mbY, mb, cbpLuma);
         Intra16x16PredictionBuilder.predictWithMode(mbType % 4, mb.getPlaneData(0), leftAvailable, topAvailable,
-                leftRow[0], topLine[0], mbX << 4);
+                leftRow[0], topLine[0], topLeft[0], mbX << 4);
 
         decodeChroma(reader, cbpChroma, chromaPredictionMode, mbX, mbY, leftAvailable, topAvailable, mb, qp,
                 MBType.I_16x16);
         mbTypes[address] = topMBType[mbX] = leftMBType = MBType.I_16x16;
         topCBPLuma[mbX] = leftCBPLuma = cbpLuma;
         topCBPChroma[mbX] = leftCBPChroma = cbpChroma;
+        
+        collectPredictors(mb, mbX);
+    }
+
+    private int readMBQpDelta(BitReader reader, MBType prevMbType) {
+        int mbQPDelta;
+        if (!activePps.entropy_coding_mode_flag) {
+            mbQPDelta = readSE(reader, "mb_qp_delta");
+        } else {
+            mbQPDelta = cabac.readMBQpDelta(mDecoder, prevMbType);
+        }
+        return mbQPDelta;
+    }
+
+    private int readChromaPredMode(BitReader reader, int mbX, boolean leftAvailable, boolean topAvailable) {
+        int chromaPredictionMode;
+        if (!activePps.entropy_coding_mode_flag) {
+            chromaPredictionMode = readUE(reader, "MBP: intra_chroma_pred_mode");
+        } else {
+            chromaPredictionMode = cabac.readIntraChromaPredMode(mDecoder, mbX, leftMBType, topMBType[mbX],
+                    leftAvailable, topAvailable);
+        }
+        return chromaPredictionMode;
     }
 
     private void residualLumaI16x16(BitReader reader, boolean leftAvailable, boolean topAvailable, int mbX, int mbY,
@@ -417,9 +450,9 @@ public class SliceDecoder {
         mbQps[1][addr] = qp1;
         mbQps[2][addr] = qp2;
         ChromaPredictionBuilder.predictWithMode(mb.getPlaneData(1), chromaMode, mbX, leftAvailable, topAvailable,
-                leftRow[1], topLine[1]);
+                leftRow[1], topLine[1], topLeft[1]);
         ChromaPredictionBuilder.predictWithMode(mb.getPlaneData(2), chromaMode, mbX, leftAvailable, topAvailable,
-                leftRow[2], topLine[2]);
+                leftRow[2], topLine[2], topLeft[2]);
     }
 
     private void decodeChromaResidual(BitReader reader, boolean leftAvailable, boolean topAvailable, int mbX, int mbY,
@@ -480,7 +513,7 @@ public class SliceDecoder {
         return QP_SCALE_CR[MathUtil.clip(qp + crQpOffset, 0, 51)];
     }
 
-    public void decodeMBlockIntraNxN(BitReader reader, int mbIndex, Picture mb) {
+    public void decodeMBlockIntraNxN(BitReader reader, int mbIndex, MBType prevMbType, Picture mb) {
         boolean transform8x8Used = false;
         if (transform8x8) {
             if (readBool(reader, "transform_size_8x8_flag"))
@@ -489,46 +522,61 @@ public class SliceDecoder {
 
         int mbX = mapper.getMbX(mbIndex);
         int mbY = mapper.getMbY(mbIndex);
+        int address = mapper.getAddress(mbIndex);
         boolean leftAvailable = mapper.leftAvailable(mbIndex);
         boolean topAvailable = mapper.topAvailable(mbIndex);
+        boolean topRightAvailable = mapper.topRightAvailable(mbIndex);
 
         int[] lumaModes = new int[16];
         for (int i = 0; i < 16; i++) {
             int blkX = H264Const.MB_BLK_OFF_LEFT[i];
             int blkY = H264Const.MB_BLK_OFF_TOP[i];
-            lumaModes[i] = readPredictionI4x4Block(reader, blkX == 0 ? leftAvailable : true, blkY == 0 ? topAvailable
-                    : true, blkX == 0 ? leftMBType : MBType.I_NxN, blkY == 0 ? topMBType[mbX] : MBType.I_NxN, blkX,
-                    blkY, mbX);
+            lumaModes[i] = readPredictionI4x4Block(reader, leftAvailable, topAvailable, leftMBType, topMBType[mbX],
+                    blkX, blkY, mbX);
         }
+        int chromaMode = readChromaPredMode(reader, mbX, leftAvailable, topAvailable);
 
-        int chromaMode = readUE(reader, "intra_chroma_pred_mode");
-
-        int codedBlockPattern = readCodedBlockPatternIntra(reader);
+        int codedBlockPattern = readCodedBlockPatternIntra(reader, leftAvailable, topAvailable, leftCBPLuma
+                | (leftCBPChroma << 4), topCBPLuma[mbX] | (topCBPChroma[mbX] << 4), leftMBType, topMBType[mbX]);
 
         int cbpLuma = codedBlockPattern & 0xf;
         int cbpChroma = codedBlockPattern >> 4;
 
         if (cbpLuma > 0 || cbpChroma > 0) {
-            qp = (qp + readSE(reader, "mb_qp_delta") + 52) % 52;
+            qp = (qp + readMBQpDelta(reader, prevMbType) + 52) % 52;
         }
+        mbQps[0][address] = qp;
 
         residualLuma(reader, leftAvailable, topAvailable, mbX, mbY, mb, cbpLuma, MBType.I_NxN);
 
         for (int i = 0; i < 16; i++) {
-            int blkX = H264Const.MB_BLK_OFF_LEFT[i];
-            int blkY = H264Const.MB_BLK_OFF_TOP[i];
-            Intra4x4PredictionBuilder.predictWithMode(lumaModes[i], mb.getPlaneData(0), blkX == 0 ? leftAvailable
-                    : true, blkY == 0 ? topAvailable : true, leftRow[0], topLine[0], (mbX << 4), H264Const.BLK_X[i],
-                    H264Const.BLK_Y[i]);
+            int blkX = (i & 3) << 2;
+            int blkY = i & ~3;
+            
+            int bi = H264Const.BLK_INV_MAP[i];
+            boolean trAvailable = ((bi == 0 || bi == 1 || bi == 4) && topAvailable) || (bi == 5 && topRightAvailable) || bi == 2 || bi == 6 || bi == 8 || bi == 9 || bi == 10 || bi == 12 || bi == 14;
+            
+            Intra4x4PredictionBuilder.predictWithMode(lumaModes[bi], mb.getPlaneData(0), blkX == 0 ? leftAvailable
+                    : true, blkY == 0 ? topAvailable : true, trAvailable, leftRow[0], topLine[0], topLeft[0], (mbX << 4), blkX,
+                    blkY);
         }
 
         decodeChroma(reader, cbpChroma, chromaMode, mbX, mbY, leftAvailable, topAvailable, mb, qp, MBType.I_NxN);
 
-        topMBType[mbX] = leftMBType = MBType.I_NxN;
+        mbTypes[address] = topMBType[mbX] = leftMBType = MBType.I_NxN;
+        topCBPLuma[mbX] = leftCBPLuma = cbpLuma;
+        topCBPChroma[mbX] = leftCBPChroma = cbpChroma;
+        
+        collectChromaPredictors(mb, mbX);
     }
 
-    protected int readCodedBlockPatternIntra(BitReader reader) {
-        return H264Const.CODED_BLOCK_PATTERN_INTRA_COLOR[readUE(reader, "coded_block_pattern")];
+    protected int readCodedBlockPatternIntra(BitReader reader, boolean leftAvailable, boolean topAvailable,
+            int leftCBP, int topCBP, MBType leftMB, MBType topMB) {
+
+        if (!activePps.entropy_coding_mode_flag)
+            return H264Const.CODED_BLOCK_PATTERN_INTRA_COLOR[readUE(reader, "coded_block_pattern")];
+        else
+            return cabac.codedBlockPatternIntra(mDecoder, leftAvailable, topAvailable, leftCBP, topCBP, leftMB, topMB);
     }
 
     private void residualLuma(BitReader reader, boolean leftAvailable, boolean topAvailable, int mbX, int mbY,
@@ -545,8 +593,9 @@ public class SliceDecoder {
                 nCoeff[0][blkY][blkX] = cavlc[0].readACBlock(reader, ac, blkX, blkOffTop, leftAvailable, topAvailable,
                         0, 16, CoeffTransformer.zigzag4x4);
             } else {
-                if (cabac.readCodedBlockFlagChromaAC(mDecoder, blkX, blkOffTop, 0, leftMBType, topMBType[mbX],
-                        leftAvailable, topAvailable, leftCBPChroma, topCBPChroma[mbX], curMbType) == 1)
+                if (cabac.readCodedBlockFlagLumaAC(mDecoder, BlockType.LUMA_16, blkX, blkOffTop, 0, leftMBType,
+                        topMBType[mbX], leftAvailable, topAvailable, leftCBPLuma, topCBPLuma[mbX], cbpLuma,
+                        MBType.I_NxN) == 1)
                     nCoeff[0][blkY][blkX] = cabac.readCoeffs(mDecoder, BlockType.LUMA_16, ac, 0, 16,
                             CoeffTransformer.zigzag4x4);
             }
@@ -560,16 +609,30 @@ public class SliceDecoder {
     private int readPredictionI4x4Block(BitReader reader, boolean leftAvailable, boolean topAvailable,
             MBType leftMBType, MBType topMBType, int blkX, int blkY, int mbX) {
         int mode = 2;
-        if (leftAvailable && topAvailable && leftMBType.isIntra() && topMBType.isIntra()) {
-            mode = Math.min(topMBType == MBType.I_NxN ? i4x4PredTop[mbX + blkX] : 2,
-                    leftMBType == MBType.I_NxN ? i4x4PredLeft[blkY] : 2);
+        if ((leftAvailable && leftMBType.isIntra() || blkX > 0) && (topAvailable && topMBType.isIntra() || blkY > 0)) {
+            mode = Math.min(topMBType == MBType.I_NxN || blkY > 0 ? i4x4PredTop[(mbX << 2) + blkX] : 2,
+                    leftMBType == MBType.I_NxN || blkY > 0 ? i4x4PredLeft[blkY] : 2);
         }
-        if (!readBool(reader, "MBP: prev_intra4x4_pred_mode_flag")) {
-            int rem_intra4x4_pred_mode = readNBit(reader, 3, "MB: rem_intra4x4_pred_mode");
+        if (!prev4x4PredMode(reader)) {
+            int rem_intra4x4_pred_mode = rem4x4PredMode(reader);
             mode = rem_intra4x4_pred_mode + (rem_intra4x4_pred_mode < mode ? 0 : 1);
         }
-        i4x4PredTop[mbX + blkX] = i4x4PredLeft[blkY] = mode;
+        i4x4PredTop[(mbX << 2) + blkX] = i4x4PredLeft[blkY] = mode;
         return mode;
+    }
+
+    private int rem4x4PredMode(BitReader reader) {
+        if (!activePps.entropy_coding_mode_flag)
+            return readNBit(reader, 3, "MB: rem_intra4x4_pred_mode");
+        else
+            return cabac.rem4x4PredMode(mDecoder);
+    }
+
+    private boolean prev4x4PredMode(BitReader reader) {
+        if (!activePps.entropy_coding_mode_flag)
+            return readBool(reader, "MBP: prev_intra4x4_pred_mode_flag");
+        else
+            return cabac.prev4x4PredModeFlag(mDecoder);
     }
 
     private void decodeInter16x8(BitReader reader, Picture mb, Picture[] references, int mbIdx) {
@@ -611,6 +674,8 @@ public class SliceDecoder {
                 { x2, y2, refIdx2 }, { x2, y2, refIdx2 }, { x2, y2, refIdx2 }, { x2, y2, refIdx2 } };
 
         residualInter(reader, mb, references, leftAvailable, topAvailable, mbX, mbY, x);
+        
+        collectPredictors(mb, mbX);
     }
 
     private void residualInter(BitReader reader, Picture mb, Picture[] references, boolean leftAvailable,
@@ -669,6 +734,8 @@ public class SliceDecoder {
                 { x2, y2, refIdx2 }, { x2, y2, refIdx2 }, { x2, y2, refIdx2 }, { x2, y2, refIdx2 } };
 
         residualInter(reader, mb, references, leftAvailable, topAvailable, mbX, mbY, x);
+        
+        collectPredictors(mb, mbX);
     }
 
     private void decodeInter16x16(BitReader reader, Picture mb, Picture[] references, int mbIdx) {
@@ -696,6 +763,8 @@ public class SliceDecoder {
                 { x1, y1, refIdx1 }, { x1, y1, refIdx1 }, { x1, y1, refIdx1 }, { x1, y1, refIdx1 } };
 
         residualInter(reader, mb, references, leftAvailable, topAvailable, mbX, mbY, x);
+        
+        collectPredictors(mb, mbX);
     }
 
     private void saveVect(int[][] mv, int from, int to, int x, int y, int r) {
@@ -821,6 +890,8 @@ public class SliceDecoder {
         residualLuma(reader, leftAvailable, topAvailable, mbX, mbY, mb, cbpLuma, MBType.P_8x8);
 
         decodeChromaInter(reader, codedBlockPattern >> 4, references, x, leftAvailable, topAvailable, mbX, mbY, qp, mb);
+        
+        collectPredictors(mb, mbX);
     }
 
     private void savePrediction8x8(int mbX, int[][] x) {
@@ -932,7 +1003,9 @@ public class SliceDecoder {
         }
     }
 
-    public void decodeMBlockIPCM(BitReader reader, Picture mb) {
+    public void decodeMBlockIPCM(BitReader reader, int mbIndex, Picture mb) {
+        int mbX = mapper.getMbX(mbIndex);
+        
         reader.align();
 
         int[] samplesLuma = new int[256];
@@ -946,6 +1019,7 @@ public class SliceDecoder {
         for (int i = 0; i < 2 * MbWidthC * MbHeightC; i++) {
             samplesChroma[i] = reader.readNBit(8);
         }
+        collectPredictors(mb, mbX);
     }
 
     public void decodePSkip(Picture[] reference, int mbIdx, int qp, Picture mb) {

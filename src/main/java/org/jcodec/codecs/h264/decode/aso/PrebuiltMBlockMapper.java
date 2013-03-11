@@ -51,4 +51,11 @@ public class PrebuiltMBlockMapper implements Mapper {
     public int getMbY(int index) {
         return getAddress(index) / picWidthInMbs;
     }
+
+    public boolean topRightAvailable(int mbIndex) {
+        int mbAddr = map.getInverse()[groupId][mbIndex + indexOfFirstMb];
+        int topRMBAddr = mbAddr - picWidthInMbs + 1;
+
+        return !((topRMBAddr < firstMBInSlice) || (map.getGroups()[topRMBAddr] != groupId));
+    }
 }

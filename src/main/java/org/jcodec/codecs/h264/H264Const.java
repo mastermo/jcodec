@@ -442,6 +442,8 @@ public class H264Const {
     public static int[] BLK_X = new int[] { 0, 4, 0, 4, 8, 12, 8, 12, 0, 4, 0, 4, 8, 12, 8, 12 };
     public static int[] BLK_Y = new int[] { 0, 0, 4, 4, 0, 0, 4, 4, 8, 8, 12, 12, 8, 8, 12, 12 };
 
+    public static int[] BLK_INV_MAP = { 0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15 };
+
     public static int[] MB_BLK_OFF_LEFT = new int[] { 0, 1, 0, 1, 2, 3, 2, 3, 0, 1, 0, 1, 2, 3, 2, 3 };
     public static int[] MB_BLK_OFF_TOP = new int[] { 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3 };
 

@@ -40,4 +40,9 @@ public class FlatMBlockMapper implements Mapper {
     public int getMbY(int index) {
         return getAddress(index) / frameWidthInMbs;
     }
+
+    public boolean topRightAvailable(int index) {
+        int mbAddr = index + firstMBAddr;
+        return mbAddr - frameWidthInMbs + 1 >= firstMBAddr;
+    }
 }

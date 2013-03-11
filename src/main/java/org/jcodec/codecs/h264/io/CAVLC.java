@@ -1,5 +1,6 @@
 package org.jcodec.codecs.h264.io;
 
+import static org.jcodec.codecs.h264.decode.CAVLCReader.readBool;
 import static org.jcodec.codecs.h264.decode.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.decode.CAVLCReader.readZeroBitCount;
 import static org.jcodec.common.model.ColorSpace.YUV420;

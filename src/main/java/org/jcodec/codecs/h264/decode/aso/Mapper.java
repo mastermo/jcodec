@@ -11,4 +11,6 @@ public interface Mapper {
     int getMbX(int mbIndex);
 
     int getMbY(int mbIndex);
+
+    boolean topRightAvailable(int mbIndex);
 }

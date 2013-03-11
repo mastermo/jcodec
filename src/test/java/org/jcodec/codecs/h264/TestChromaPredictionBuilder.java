@@ -36,10 +36,10 @@ public class TestChromaPredictionBuilder extends TestCase {
         int[] actualCb = new int[64];
         int[] actualCr = new int[64];
 
-		ChromaPredictionBuilder.predictVertical(actualCb, 0, false, true,
-                null, topCb);
-        ChromaPredictionBuilder.predictVertical(actualCr, 0, false, true,
-                null, topCr);
+		ChromaPredictionBuilder.predictVertical(actualCb, 0, true,
+                 topCb);
+        ChromaPredictionBuilder.predictVertical(actualCr, 0, true,
+                 topCr);
 		
 		assertArrayEquals(expectedCb, actualCb);
 		assertArrayEquals(expectedCr, actualCr);
@@ -67,19 +67,19 @@ public class TestChromaPredictionBuilder extends TestCase {
 			141,141,141,141,141,141,141,141
 		};
 		
-		int[] leftCb = new int[] {115, 115, 115, 115, 115, 118, 116, 111, 108};
-		int[] topCb = new int[] {115, 115, 115, 115, 115, 115, 115, 115};
+		int[] leftCb = new int[] {115, 115, 115, 115, 118, 116, 111, 108};
+//		int[] topCb = new int[] {115, 115, 115, 115, 115, 115, 115, 115};
 		
-		int[] leftCr = new int[] {135, 137, 137, 137, 137, 131, 134, 139, 141};
-		int[] topCr = new int[] {135, 135, 135, 135, 135, 135, 135, 135};
+		int[] leftCr = new int[] { 137, 137, 137, 137, 131, 134, 139, 141};
+//		int[] topCr = new int[] {135, 135, 135, 135, 135, 135, 135, 135};
 
 		int[] actualCb = new int[64];
 		int[] actualCr = new int[64];
 		
-		ChromaPredictionBuilder.predictHorizontal(actualCb, 0, true, true,
-                leftCb, topCb);
-        ChromaPredictionBuilder.predictHorizontal(actualCr, 0, true, true,
-                leftCr, topCr);
+		ChromaPredictionBuilder.predictHorizontal(actualCb, 0, true,
+                leftCb);
+        ChromaPredictionBuilder.predictHorizontal(actualCr, 0, true,
+                leftCr);
 		
 		assertArrayEquals(expectedCb, actualCb);
 		assertArrayEquals(expectedCr, actualCr);
@@ -109,14 +109,14 @@ public class TestChromaPredictionBuilder extends TestCase {
 		};
 		
 		int[] leftCb = new int[] {
-			120, 118, 118, 118, 118, 118, 118, 118, 118
+			 118, 118, 118, 118, 118, 118, 118, 118
 		};
 		int[] topCb = new int[] {
 			120, 120, 120, 120, 120, 120, 120, 120
 		};
 		
 		int[] leftCr = new int[] {
-			131, 131, 131, 131, 131, 132, 132, 132, 132
+			 131, 131, 131, 131, 132, 132, 132, 132
 		};
 		
 		int[] topCr = new int[] {
@@ -158,19 +158,21 @@ public class TestChromaPredictionBuilder extends TestCase {
 			136, 136, 135, 135, 134, 133, 133, 132
 		};
 		
-		int[] leftCb = new int[] {113, 116, 116, 116, 116, 119, 119, 119, 119};
-		int[] topCb = new int[] {118, 118, 118, 118, 119, 119, 119, 119};
+		int[] leftCb = {116, 116, 116, 116, 119, 119, 119, 119};
+		int[] tlCb = {113};
+		int[] topCb = {118, 118, 118, 118, 119, 119, 119, 119};
 
-		int[] leftCr = new int[] {141, 137, 137, 137, 137, 138, 138, 138, 138};
-		int[] topCr = new int[] {132, 132, 132, 132, 132, 132, 132, 132};
+		int[] leftCr =  {137, 137, 137, 137, 138, 138, 138, 138};
+		int[] tlCr = {141};
+		int[] topCr =  {132, 132, 132, 132, 132, 132, 132, 132};
 		
 
 		int[] actualCb = new int[64];
 		int[] actualCr = new int[64];
 		ChromaPredictionBuilder.predictPlane(actualCb, 0, true, true,
-	            leftCb, topCb);
+	            leftCb, topCb, tlCb);
 		ChromaPredictionBuilder.predictPlane(actualCr, 0, true, true,
-                leftCr, topCr);
+                leftCr, topCr, tlCr);
 		
 		assertArrayEquals(expectedCb, actualCb);
 		assertArrayEquals(expectedCr, actualCr);

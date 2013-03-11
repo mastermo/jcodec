@@ -25,7 +25,7 @@ public class TestIntra16x16PredictionBuilder extends TestCase {
         int[] top = new int[] { 28, 132, 205, 207, 207, 207, 207, 207, 207, 207, 207, 206, 206, 206, 206, 206 };
 
         int[] actual = new int[256];
-        Intra16x16PredictionBuilder.predictVertical(actual, false, true, null, top, 0);
+        Intra16x16PredictionBuilder.predictVertical(actual, true, top, 0);
 
         assertArrayEquals(expected, actual);
     }
@@ -45,11 +45,11 @@ public class TestIntra16x16PredictionBuilder extends TestCase {
                 135, 135, 135, 135, 135, 135, 135, 135, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125,
                 125, 125, 125, 125, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114 };
 
-        int[] left = new int[] { 233, 234, 233, 232, 232, 234, 234, 233, 233, 235, 237, 237, 204, 165, 135, 125, 114 };
-        int[] top = new int[] {  231, 231, 231, 231, 229, 227, 223, 221, 209, 207, 203, 201, 202, 202, 202, 202 };
+        int[] left = new int[] { 234, 233, 232, 232, 234, 234, 233, 233, 235, 237, 237, 204, 165, 135, 125, 114 };
+//        int[] top = new int[] {  231, 231, 231, 231, 229, 227, 223, 221, 209, 207, 203, 201, 202, 202, 202, 202 };
 
         int[] actual = new int[256];
-        Intra16x16PredictionBuilder.predictHorizontal(actual, true, true, left, top, 0);
+        Intra16x16PredictionBuilder.predictHorizontal(actual, true, left, 0);
 
         assertArrayEquals(expected, actual);
     }
@@ -69,7 +69,7 @@ public class TestIntra16x16PredictionBuilder extends TestCase {
                 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194,
                 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 194 };
 
-        int[] left = new int[] { 101, 147, 196, 206, 213, 206, 208, 212, 214, 214, 214, 214, 214, 208, 209, 192, 154 };
+        int[] left = new int[] { 147, 196, 206, 213, 206, 208, 212, 214, 214, 214, 214, 214, 208, 209, 192, 154 };
         int[] top = new int[] { 132, 182, 204, 202, 210, 210, 210, 210, 210, 210, 183, 130, 136, 189, 194, 178 };
 
         int[] actual = new int[256];
@@ -94,11 +94,12 @@ public class TestIntra16x16PredictionBuilder extends TestCase {
                 187, 91, 97, 103, 110, 116, 122, 129, 135, 141, 148, 154, 160, 167, 173, 179, 186, 90, 96, 102, 109,
                 115, 121, 128, 134, 140, 147, 153, 159, 166, 172, 178, 185 };
 
-        int[] left = new int[] { 122, 97, 94, 88, 86, 92, 92, 92, 92, 91, 99, 100, 94, 96, 89, 79, 76 };
-        int[] top = new int[] {  110, 95, 108, 158, 199, 199, 199, 199, 204, 202, 196, 193, 199, 202, 206, 208 };
+        int[] left =  { 97, 94, 88, 86, 92, 92, 92, 92, 91, 99, 100, 94, 96, 89, 79, 76 };
+        int[] tl = {122};
+        int[] top =  {  110, 95, 108, 158, 199, 199, 199, 199, 204, 202, 196, 193, 199, 202, 206, 208 };
 
         int[] actual = new int[256];
-        Intra16x16PredictionBuilder.predictPlane(actual, true, true, left, top, 0);
+        Intra16x16PredictionBuilder.predictPlane(actual, true, true, left, top, tl, 0);
 
         assertArrayEquals(expected, actual);
     }
@@ -119,12 +120,13 @@ public class TestIntra16x16PredictionBuilder extends TestCase {
                 53, 62, 72, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180, 39, 48, 57, 66, 75, 84, 93, 102,
                 111, 120, 129, 138, 147, 156, 165, 175 };
 
-        int[] left = new int[] { 160, 140, 138, 133, 130, 128, 123, 113, 108, 101, 96, 86, 81, 74, 72, 67, 64 };
-        int[] top = new int[] { 68, 76, 91, 98, 112, 120, 135, 142, 158, 166, 181, 188, 202, 210, 225, 232 };
+        int[] left = { 140, 138, 133, 130, 128, 123, 113, 108, 101, 96, 86, 81, 74, 72, 67, 64 };
+        int[] tl = {160};
+        int[] top =  { 68, 76, 91, 98, 112, 120, 135, 142, 158, 166, 181, 188, 202, 210, 225, 232 };
         
 
         int[] actual = new int[256];
-        Intra16x16PredictionBuilder.predictPlane(actual, true, true, left, top, 0);
+        Intra16x16PredictionBuilder.predictPlane(actual, true, true, left, top, tl, 0);
 
         assertArrayEquals(expected, actual);
     }

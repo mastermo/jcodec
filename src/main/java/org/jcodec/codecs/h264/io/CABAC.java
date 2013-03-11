@@ -92,10 +92,10 @@ public class CABAC {
                 ++numGt1;
             out[reorder[j + first]] = MathUtil.toSigned(absLev + 1, -decoder.decodeBinBypass());
         }
-//        System.out.print("[");
-//        for (int i = 0; i < out.length; i++)
-//            System.out.print(out[i] + ",");
-//        System.out.println("]");
+        // System.out.print("[");
+        // for (int i = 0; i < out.length; i++)
+        // System.out.print(out[i] + ",");
+        // System.out.println("]");
 
         return numGt1 + numEq1;
     }
@@ -322,7 +322,7 @@ public class CABAC {
         else
             mode = 3;
         chromaPredModeLeft = chromaPredModeTop[mbX] = mode;
-        
+
         return mode;
     }
 
@@ -405,17 +405,17 @@ public class CABAC {
     }
 
     public int readCodedBlockFlagChromaAC(MDecoder decoder, int blkX, int blkY, int comp, MBType left, MBType top,
-            boolean leftAvailable, boolean topAvailable, int leftCBPChroma, int topCBPChroma,  MBType cur) {
+            boolean leftAvailable, boolean topAvailable, int leftCBPChroma, int topCBPChroma, MBType cur) {
         int blkOffLeft = blkX & 1, blkOffTop = blkY & 1;
 
         int tLeft;
         if (blkOffLeft == 0)
-            tLeft = condTerm(cur, leftAvailable, left, leftCBPChroma == 2, codedBlkLeft[comp][blkOffTop]);
+            tLeft = condTerm(cur, leftAvailable, left, (leftCBPChroma & 2) != 0, codedBlkLeft[comp][blkOffTop]);
         else
             tLeft = condTerm(cur, true, cur, true, codedBlkLeft[comp][blkOffTop]);
         int tTop;
         if (blkOffTop == 0)
-            tTop = condTerm(cur, topAvailable, top, topCBPChroma == 2, codedBlkTop[comp][blkX]);
+            tTop = condTerm(cur, topAvailable, top, (topCBPChroma & 2) != 0, codedBlkTop[comp][blkX]);
         else
             tTop = condTerm(cur, true, cur, true, codedBlkTop[comp][blkX]);
 
@@ -425,5 +425,41 @@ public class CABAC {
         codedBlkTop[comp][blkX] = decoded;
 
         return decoded;
+    }
+
+    public boolean prev4x4PredModeFlag(MDecoder decoder) {
+        return decoder.decodeBin(68) == 1;
+    }
+
+    public int rem4x4PredMode(MDecoder decoder) {
+        return decoder.decodeBin(69) | (decoder.decodeBin(69) << 1) | (decoder.decodeBin(69) << 2);
+    }
+
+    public int codedBlockPatternIntra(MDecoder mDecoder, boolean leftAvailable, boolean topAvailable, int cbpLeft,
+            int cbpTop, MBType mbLeft, MBType mbTop) {
+        int cbp0 = mDecoder.decodeBin(73 + condTerm(leftAvailable, mbLeft, (cbpLeft >> 1) & 1) + 2
+                * condTerm(topAvailable, mbTop, (cbpTop >> 2) & 1));
+        int cbp1 = mDecoder.decodeBin(73 + (1 - cbp0) + 2 * condTerm(topAvailable, mbTop, (cbpTop >> 3) & 1));
+        int cbp2 = mDecoder.decodeBin(73 + condTerm(leftAvailable, mbLeft, (cbpLeft >> 3) & 1) + 2 * (1 - cbp0));
+        int cbp3 = mDecoder.decodeBin(73 + (1 - cbp2) + 2 * (1 - cbp1));
+
+        int cr0 = mDecoder.decodeBin(77 + condTermCr0(leftAvailable, mbLeft, cbpLeft >> 4) + 2
+                * condTermCr0(topAvailable, mbTop, cbpTop >> 4));
+        int cr1 = mDecoder.decodeBin(81 + condTermCr1(leftAvailable, mbLeft, cbpLeft >> 4) + 2
+                * condTermCr1(topAvailable, mbTop, cbpTop >> 4));
+
+        return cbp0 | (cbp1 << 1) | (cbp2 << 2) | (cbp3 << 3) | (cr0 << 4) | (cr1 << 5);
+    }
+
+    private int condTermCr0(boolean avb, MBType mbt, int cbpChroma) {
+        return avb && (mbt == MBType.I_PCM || mbt != null && cbpChroma != 0) ? 1 : 0;
+    }
+
+    private int condTermCr1(boolean avb, MBType mbt, int cbpChroma) {
+        return avb && (mbt == MBType.I_PCM || mbt != null && (cbpChroma & 2) != 0) ? 1 : 0;
+    }
+
+    private int condTerm(boolean avb, MBType mbt, int cbp) {
+        return !avb || mbt == MBType.I_PCM || (mbt != null && cbp == 1) ? 0 : 1;
     }
 }
